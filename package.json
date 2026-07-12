@@ -1,0 +1,53 @@
+{
+  "name": "rooh-and-rang-stories",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:website": "pnpm --filter @rooh/website dev",
+    "dev:admin": "pnpm --filter @rooh/admin dev",
+    "dev:gallery": "pnpm --filter @rooh/gallery dev",
+    "build": "prisma generate && next build",
+    "build:apps": "pnpm --filter @rooh/website build && pnpm --filter @rooh/admin build && pnpm --filter @rooh/gallery build",
+    "start": "next start",
+    "lint": "eslint .",
+    "postinstall": "prisma generate",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:supabase": "prisma migrate deploy",
+    "db:copy:neon": "tsx scripts/migrate-neon-to-supabase.ts",
+    "auth:verify:supabase": "tsx scripts/verify-supabase-admin.ts",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "https://registry.npmjs.org/@prisma/client/-/client-6.19.0.tgz",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.110.2",
+    "bcryptjs": "^3.0.2",
+    "clsx": "^2.1.1",
+    "googleapis": "^173.0.0",
+    "lucide-react": "^1.18.0",
+    "next": "16.2.9",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.6",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9.39.1",
+    "eslint-config-next": "^16.2.9",
+    "postcss": "^8.5.6",
+    "prisma": "https://registry.npmjs.org/prisma/-/prisma-6.19.0.tgz",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}

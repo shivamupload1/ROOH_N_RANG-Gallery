@@ -1,0 +1,278 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  ADMIN
+  CLIENT
+  GUEST
+}
+
+enum DriveAccountType {
+  CLIENT_PERSONAL
+  STUDIO_WORKSPACE
+  SHARED_DRIVE
+}
+
+enum DriveAccountStatus {
+  CONNECTED
+  EXPIRED
+  REVOKED
+}
+
+enum MediaType {
+  PHOTO
+  VIDEO
+}
+
+enum InquiryStatus {
+  NEW
+  CONTACTED
+  BOOKED
+  ARCHIVED
+}
+
+enum PreviewStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum GalleryAccessMode {
+  PIN
+  PUBLIC
+}
+
+model User {
+  id           String     @id @default(cuid())
+  authUserId   String?    @unique
+  name         String?
+  email        String     @unique
+  phone        String?
+  passwordHash String?
+  role         UserRole   @default(CLIENT)
+  clients      Client[]
+  favorites    Favorite[]
+  downloads    Download[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Client {
+  id            String         @id @default(cuid())
+  userId        String?
+  user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name          String
+  email         String?
+  phone         String?
+  city          String?
+  notes         String?
+  driveAccounts DriveAccount[]
+  events        Event[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([email])
+  @@index([phone])
+}
+
+model DriveAccount {
+  id                    String             @id @default(cuid())
+  clientId              String?
+  client                Client?            @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  label                 String
+  googleEmail           String?
+  accountType           DriveAccountType   @default(CLIENT_PERSONAL)
+  encryptedAccessToken  String?
+  encryptedRefreshToken String?
+  tokenExpiry           DateTime?
+  rootFolderId          String?
+  sharedDriveId         String?
+  status                DriveAccountStatus @default(REVOKED)
+  events                Event[]
+  mediaFiles            MediaFile[]
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@index([clientId])
+  @@index([status])
+}
+
+model Event {
+  id              String       @id @default(cuid())
+  clientId        String
+  client          Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  driveAccountId  String
+  driveAccount    DriveAccount @relation(fields: [driveAccountId], references: [id], onDelete: Restrict)
+  name            String
+  slug            String       @unique
+  eventType       String?
+  eventDate       DateTime?
+  city            String?
+  pinHash         String
+  accessMode      GalleryAccessMode @default(PIN)
+  driveFolderId   String?
+  expiryDate      DateTime?
+  downloadAllowed Boolean      @default(false)
+  isPublished     Boolean      @default(false)
+  albums          Album[]
+  mediaFiles      MediaFile[]
+  favorites       Favorite[]
+  downloads       Download[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([clientId])
+  @@index([driveAccountId])
+  @@index([isPublished])
+  @@index([expiryDate])
+}
+
+model Album {
+  id            String      @id @default(cuid())
+  eventId       String
+  event         Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name          String
+  slug          String
+  sortOrder     Int         @default(0)
+  driveFolderId String?
+  mediaFiles    MediaFile[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([eventId, slug])
+  @@index([eventId])
+}
+
+model MediaFile {
+  id              String       @id @default(cuid())
+  eventId         String
+  event           Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  albumId         String?
+  album           Album?       @relation(fields: [albumId], references: [id], onDelete: SetNull)
+  driveAccountId  String
+  driveAccount    DriveAccount @relation(fields: [driveAccountId], references: [id], onDelete: Restrict)
+  driveFileId     String
+  fileName        String
+  mimeType        String
+  fileSize        BigInt?
+  mediaType       MediaType
+  thumbnailUrl    String?
+  previewUrl      String?
+  previewStatus   PreviewStatus @default(PENDING)
+  previewStoragePath String?
+  previewWidth    Int?
+  previewHeight   Int?
+  previewBytes    Int?
+  previewMimeType String?
+  previewError    String?
+  previewGeneratedAt DateTime?
+  width           Int?
+  height          Int?
+  duration        Int?
+  downloadAllowed Boolean      @default(false)
+  isFeatured      Boolean      @default(false)
+  favorites       Favorite[]
+  downloads       Download[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([driveAccountId, driveFileId])
+  @@index([eventId])
+  @@index([albumId])
+  @@index([mediaType])
+  @@index([isFeatured])
+  @@index([previewStatus])
+}
+
+model Favorite {
+  id          String    @id @default(cuid())
+  eventId     String
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  mediaFileId String
+  mediaFile   MediaFile @relation(fields: [mediaFileId], references: [id], onDelete: Cascade)
+  visitorId   String?
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+
+  @@unique([eventId, mediaFileId, visitorId])
+  @@unique([eventId, mediaFileId, userId])
+  @@index([visitorId])
+  @@index([userId])
+}
+
+model Download {
+  id           String    @id @default(cuid())
+  eventId      String
+  event        Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  mediaFileId  String
+  mediaFile    MediaFile @relation(fields: [mediaFileId], references: [id], onDelete: Cascade)
+  visitorId    String?
+  userId       String?
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ipAddress    String?
+  userAgent    String?
+  downloadedAt DateTime  @default(now())
+
+  @@index([eventId])
+  @@index([mediaFileId])
+  @@index([visitorId])
+  @@index([userId])
+}
+
+model Inquiry {
+  id        String        @id @default(cuid())
+  name      String
+  phone     String
+  email     String?
+  eventType String?
+  eventDate DateTime?
+  city      String?
+  message   String?
+  status    InquiryStatus @default(NEW)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model WebsiteContent {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Settings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InstagramPost {
+  id           String   @id
+  permalink    String
+  mediaType    String
+  mediaUrl     String?
+  thumbnailUrl String?
+  caption      String?
+  postedAt     DateTime?
+  isActive     Boolean  @default(true)
+  syncedAt     DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([isActive, postedAt])
+}

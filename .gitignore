@@ -1,0 +1,43 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.*
+
+# Next.js and static builds
+.next/
+out/
+build/
+dist/
+
+# environment and credentials
+.env
+.env.*
+!.env.example
+service-account.json
+*.pem
+
+# Prisma local database
+prisma/dev.db
+
+# logs and generated artifacts
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+outputs/
+screenshots/
+Website Data/
+
+# local package/tool caches
+.codex-npm/
+.codex-npm.tgz
+.codex-pnpm/
+.codex-pnpm.tgz
+.npm-cache/
+.pnpm-store/
+.vercel-stage/
+
+# OS files
+.DS_Store
+Thumbs.db
