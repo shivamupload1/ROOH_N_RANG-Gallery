@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Download, Heart, LockKeyhole, Play, Send, X } from "lucide-react";
+import { ArrowDown, Download, Heart, LockKeyhole, Play, Send, X } from "lucide-react";
 import { submitSelectionAction, toggleFavoriteAction, verifyGalleryPinAction } from "@/app/gallery/[eventSlug]/actions";
 import { FormField } from "@/components/admin/form-field";
+import { GalleryShareButton } from "@/components/gallery-share-button";
 import { getGallerySession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { eventCoverKey, parseEventCoverMediaId } from "@/lib/event-cover";
@@ -179,72 +180,100 @@ export default async function GalleryPage({
   const heroImageSrc = heroMedia ? `/api/media/${heroMedia.id}` : null;
   const selectedMedia = media ? allMedia.find((mediaFile) => mediaFile.id === media) || null : null;
   const selectedMediaHref = selectedMedia ? `/api/media/${selectedMedia.id}` : null;
+  const heroMeta = [event.city, formatEventDate(event.eventDate)].filter(Boolean).join(" / ");
 
   return (
-    <main className="min-h-screen bg-white text-ink">
-      <section className="relative min-h-[42vh] bg-ink md:min-h-[60vh]">
+    <main className="min-h-screen bg-[#fbfbf9] text-ink">
+      <section className="relative isolate h-[100svh] min-h-[620px] overflow-hidden bg-[#171414]">
         {heroImageSrc ? (
-          <Image src={heroImageSrc} alt={event.name} fill priority unoptimized sizes="100vw" className="absolute inset-0 object-cover" />
+          <Image
+            src={heroImageSrc}
+            alt={event.name}
+            fill
+            priority
+            unoptimized
+            sizes="100vw"
+            className="absolute inset-0 object-cover object-center"
+          />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-ink via-rust/70 to-marigold/50" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#171414] via-[#40372f] to-[#74765c]" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/15 to-black/45" />
-      </section>
+        <div className="absolute inset-0 bg-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/75" />
 
-      <section className="border-b border-ink/10 bg-white">
-        <div className="mx-auto grid max-w-[1760px] gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_auto_1fr] lg:items-end lg:px-8">
-          <div className="text-center lg:text-left">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-rust">{brand.name}</p>
-            <p className="mt-2 text-sm text-ink/55">{event.client.name}</p>
-          </div>
+        <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 py-6 text-white sm:px-8 lg:px-12">
+          <a href="#story-grid" className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/[0.85] transition hover:text-white">
+            <ArrowDown size={16} />
+            View Gallery
+          </a>
+          <p className="absolute left-1/2 hidden -translate-x-1/2 text-[11px] font-semibold uppercase tracking-[0.26em] text-white/[0.85] sm:block">
+            {brand.name}
+          </p>
+          <GalleryShareButton
+            title={`${event.name} - ${brand.name}`}
+            className="grid h-10 w-10 place-items-center rounded-full border border-white/[0.45] bg-black/10 text-white backdrop-blur-md transition hover:bg-white hover:text-ink"
+          />
+        </div>
 
-          <div className="text-center">
-            <h1 className="text-4xl font-semibold sm:text-5xl lg:text-6xl">{event.name}</h1>
-            <p className="mt-3 text-base text-ink/55">{formatEventDate(event.eventDate)}</p>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-3 lg:justify-end">
-            <div className="rounded-full border border-ink/10 px-4 py-2 text-sm font-medium text-ink/75">{favorites.length} favorites</div>
-            <div className="rounded-full border border-ink/10 px-4 py-2 text-sm font-medium text-ink/75">
-              {event.downloadAllowed ? "Downloads enabled" : "Downloads off"}
+        <div className="absolute inset-x-0 bottom-0 z-10 px-5 pb-10 text-white sm:px-8 sm:pb-12 lg:px-12 lg:pb-16">
+          <div className="mx-auto flex max-w-[2200px] items-end justify-between gap-8">
+            <div className="max-w-4xl">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/80">Private Archive</p>
+              <h1 className="mt-3 font-serif text-5xl italic leading-[0.92] sm:text-7xl lg:text-8xl">{event.name}</h1>
+              <p className="mt-5 text-sm text-white/[0.78] sm:text-base">{heroMeta}</p>
+            </div>
+            <div className="hidden items-center gap-5 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/75 md:flex">
+              <span>{favorites.length} favorites</span>
+              <span className="h-4 w-px bg-white/[0.35]" />
+              <span>{event.downloadAllowed ? "Downloads enabled" : "Downloads off"}</span>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="sticky top-0 z-10 border-b border-ink/10 bg-white/95 backdrop-blur">
-        <div className="mx-auto max-w-[1760px] overflow-x-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex min-w-max items-center gap-2 py-3">
-            {tabs.map((tab) => {
-              const isActive = tab.key === selectedView;
+      <section id="story-grid" className="sticky top-0 z-30 border-b border-black/10 bg-white/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[2400px] items-center gap-6 px-4 sm:px-7 lg:px-10">
+          <nav className="flex min-w-0 flex-1 items-center gap-7 overflow-x-auto py-5">
+              {tabs.map((tab) => {
+                const isActive = tab.key === selectedView;
 
-              return (
-                <Link
-                  key={tab.key}
-                  href={galleryHref(event.slug, tab.key)}
-                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition ${
-                    isActive
-                      ? "border-ink bg-ink text-white"
-                      : "border-ink/10 bg-white text-ink/70 hover:border-rust hover:text-rust"
-                  }`}
-                >
-                  <span>{tab.label}</span>
-                  <span className={`text-xs ${isActive ? "text-white/80" : "text-ink/45"}`}>{tab.count}</span>
-                </Link>
-              );
-            })}
+                return (
+                  <Link
+                    key={tab.key}
+                    href={galleryHref(event.slug, tab.key)}
+                    className={`relative inline-flex shrink-0 items-baseline gap-1.5 pb-1 text-[11px] font-bold uppercase tracking-[0.08em] transition after:absolute after:inset-x-0 after:-bottom-1 after:h-px after:origin-left after:bg-ink after:transition-transform ${
+                      isActive
+                        ? "text-ink after:scale-x-100"
+                        : "text-ink/[0.48] after:scale-x-0 hover:text-ink hover:after:scale-x-100"
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span className="text-[9px] font-medium text-ink/[0.38]">{tab.count}</span>
+                  </Link>
+                );
+              })}
           </nav>
+          <div className="hidden shrink-0 items-center gap-2 sm:flex">
+            <GalleryShareButton
+              title={`${event.name} - ${brand.name}`}
+              className="grid h-9 w-9 place-items-center text-ink/60 transition hover:text-ink"
+            />
+            <Link href={galleryHref(event.slug, "favorites")} className="grid h-9 w-9 place-items-center text-ink/60 transition hover:text-rust" title="Favorites">
+              <Heart size={18} />
+            </Link>
+          </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-[1760px] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <section className="mx-auto max-w-[2400px] px-2 py-8 sm:px-3 lg:px-5 lg:py-12">
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-4 px-2 sm:px-4">
           <div>
-            <h2 className="text-2xl font-semibold text-ink">{activeTab?.label || "Gallery"}</h2>
-            <p className="mt-2 text-sm text-ink/55">{activeMedia.length} photos ready in this view.</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-rust">{brand.name} Stories</p>
+            <h2 className="mt-2 font-serif text-3xl text-ink sm:text-4xl">{activeTab?.label || "Gallery"}</h2>
+            <p className="mt-2 text-xs uppercase tracking-[0.1em] text-ink/[0.45]">{activeMedia.length} photographs</p>
           </div>
           {selectedView === "favorites" ? (
-            <p className="text-sm text-ink/60">Save favorites as you browse, then submit once your shortlist is done.</p>
+            <p className="max-w-md text-sm leading-6 text-ink/55">Save favorites as you browse, then submit once your shortlist is done.</p>
           ) : null}
         </div>
 
@@ -255,7 +284,7 @@ export default async function GalleryPage({
               : "No photos are available in this section yet. Sync the Drive folder from the admin panel after adding subfolders and images."}
           </div>
         ) : (
-          <div className="columns-2 md:columns-3 xl:columns-5 2xl:columns-6 [column-gap:1rem]">
+          <div className="columns-2 md:columns-3 xl:columns-4 2xl:columns-5 min-[2400px]:columns-6 [column-gap:6px]">
             {activeMedia.map((mediaFile) => {
               const isFavorite = favoriteIds.has(mediaFile.id);
               const canDownload = event.downloadAllowed && mediaFile.downloadAllowed;
@@ -263,8 +292,7 @@ export default async function GalleryPage({
               const albumLabel = mediaFile.albumId ? albumNameById.get(mediaFile.albumId) : "My Photos";
 
               return (
-                <article key={mediaFile.id} className="mb-4 break-inside-avoid overflow-hidden rounded-md border border-black/5 bg-white shadow-[0_10px_30px_rgba(36,31,31,0.08)]">
-                  <div className="relative">
+                <article key={mediaFile.id} className="group relative mb-[6px] break-inside-avoid overflow-hidden bg-[#ecebe7]">
                     <Link href={galleryHref(event.slug, selectedView, mediaFile.id)} className="block bg-ink/10">
                       {imageSrc ? (
                         <Image
@@ -272,35 +300,27 @@ export default async function GalleryPage({
                           alt={mediaFile.fileName}
                           width={mediaFile.width || 1600}
                           height={mediaFile.height || 1200}
-                          sizes="(min-width: 1536px) 16vw, (min-width: 1280px) 20vw, (min-width: 768px) 33vw, 50vw"
+                          sizes="(min-width: 2400px) 16vw, (min-width: 1536px) 20vw, (min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
                           unoptimized
-                          className="block h-auto w-full object-cover"
+                          className="block h-auto w-full object-cover transition duration-700 ease-out group-hover:scale-[1.015]"
                         />
                       ) : (
                         <div className="flex aspect-[4/3] items-center justify-center bg-ink text-white">
                           <Play size={28} />
                         </div>
                       )}
-                    </Link>
-
-                    <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-3">
-                      <span className="rounded-full bg-white/92 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink">
+                      <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
+                      <span className="pointer-events-none absolute bottom-3 left-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-white opacity-0 transition group-hover:opacity-100">
                         {albumLabel}
                       </span>
-                      {canDownload ? (
-                        <span className="rounded-full bg-black/55 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">Download</span>
-                      ) : null}
-                    </div>
-                  </div>
+                    </Link>
 
-                  <div className="flex items-center justify-between gap-3 p-3">
-                    <p className="min-w-0 truncate text-sm font-semibold text-ink">{mediaFile.fileName}</p>
-                    <div className="flex shrink-0 gap-2">
+                    <div className="absolute right-2 top-2 flex gap-1.5 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
                       <form action={toggleFavoriteAction.bind(null, event.slug, mediaFile.id)}>
                         <button
                           type="submit"
-                          className={`flex h-9 w-9 items-center justify-center rounded-full border ${
-                            isFavorite ? "border-rust bg-rust text-white" : "border-ink/10 bg-white text-ink hover:border-rust hover:text-rust"
+                          className={`grid h-9 w-9 place-items-center rounded-full border border-white/[0.35] backdrop-blur-md transition ${
+                            isFavorite ? "bg-rust text-white" : "bg-black/[0.35] text-white hover:bg-white hover:text-ink"
                           }`}
                           title={isFavorite ? "Remove favorite" : "Save favorite"}
                         >
@@ -310,14 +330,13 @@ export default async function GalleryPage({
                       {canDownload ? (
                         <Link
                           href={`/download/${mediaFile.id}`}
-                          className="flex h-9 w-9 items-center justify-center rounded-full border border-ink/10 bg-white text-ink transition hover:border-rust hover:text-rust"
+                          className="grid h-9 w-9 place-items-center rounded-full border border-white/[0.35] bg-black/[0.35] text-white backdrop-blur-md transition hover:bg-white hover:text-ink"
                           title="Download"
                         >
                           <Download size={16} />
                         </Link>
                       ) : null}
                     </div>
-                  </div>
                 </article>
               );
             })}
@@ -325,12 +344,13 @@ export default async function GalleryPage({
         )}
       </section>
 
-      <section className="border-t border-ink/10 bg-ivory/50">
-        <div className="mx-auto max-w-[1760px] px-4 py-10 sm:px-6 lg:px-8">
-          <div className="rounded-2xl border border-marigold/25 bg-white p-6 shadow-soft">
+      <section className="border-t border-ink/10 bg-[#f1eee6]">
+        <div className="mx-auto max-w-[1760px] px-5 py-14 sm:px-8 lg:px-12 lg:py-20">
+          <div>
             <div className="flex flex-wrap items-start justify-between gap-5">
               <div className="max-w-2xl">
-                <h2 className="text-xl font-semibold text-ink">Submit your shortlist</h2>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-rust">Your edit</p>
+                <h2 className="mt-2 font-serif text-3xl text-ink">Submit your shortlist</h2>
                 <p className="mt-2 text-sm leading-6 text-ink/60">
                   Favorites are saved automatically for this visitor session. Submit once when your shortlist is final so the studio can review it.
                 </p>
@@ -352,7 +372,7 @@ export default async function GalleryPage({
               </div>
 
               <form action={submitSelectionAction.bind(null, event.slug)}>
-                <button type="submit" className="inline-flex items-center gap-2 rounded-md bg-rust px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink">
+                <button type="submit" className="inline-flex items-center gap-2 border border-ink bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-transparent hover:text-ink">
                   <Send size={17} />
                   {savedSelection ? "Resubmit Selection" : "Submit Selection"}
                 </button>
@@ -363,85 +383,72 @@ export default async function GalleryPage({
       </section>
 
       {selectedMedia && selectedMediaHref ? (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-md">
-          <div className="flex min-h-screen items-center justify-center p-4 sm:p-6 lg:p-8">
-            <div className="relative w-full max-w-[1680px] rounded-2xl bg-white/15 p-3 shadow-2xl">
-              <div className="absolute right-5 top-5 z-10 flex items-center gap-2">
+        <div className="fixed inset-0 z-50 bg-black/[0.96] text-white">
+          <div className="relative flex h-[100svh] w-full items-center justify-center overflow-hidden p-2 sm:p-5">
+              <div className="absolute right-4 top-4 z-20 flex items-center gap-2 sm:right-6 sm:top-6">
                 {event.downloadAllowed && selectedMedia.downloadAllowed ? (
                   <Link
                     href={`/download/${selectedMedia.id}`}
-                    className="inline-flex items-center gap-2 rounded-full bg-black/45 px-4 py-2 text-sm font-semibold text-white transition hover:bg-black/60"
+                    className="inline-flex h-10 items-center gap-2 rounded-full border border-white/25 bg-black/25 px-4 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-white hover:text-ink"
                   >
                     <Download size={16} />
-                    Download
+                    <span className="hidden sm:inline">Download</span>
                   </Link>
                 ) : null}
                 <Link
                   href={galleryHref(event.slug, selectedView)}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white transition hover:bg-black/60"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/25 bg-black/25 text-white backdrop-blur-md transition hover:bg-white hover:text-ink"
                   title="Close preview"
                 >
                   <X size={18} />
                 </Link>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-                <div className="overflow-hidden rounded-[20px] bg-black/80">
+              <div className="flex h-full w-full items-center justify-center">
                   {selectedMedia.mediaType === "PHOTO" ? (
                     <Image
                       src={selectedMediaHref}
                       alt={selectedMedia.fileName}
                       width={selectedMedia.width || 2000}
                       height={selectedMedia.height || 1400}
-                      sizes="(min-width: 1024px) 75vw, 100vw"
+                      sizes="96vw"
                       unoptimized
-                      className="mx-auto h-auto max-h-[82vh] w-auto max-w-full object-contain"
+                      className="h-auto max-h-[96svh] w-auto max-w-[96vw] object-contain"
                     />
                   ) : (
-                    <div className="flex min-h-[50vh] items-center justify-center text-white">
+                    <div className="flex min-h-[60vh] min-w-[70vw] items-center justify-center text-white">
                       <div className="text-center">
                         <Play className="mx-auto" size={40} />
                         <p className="mt-4 text-sm font-medium">Video preview</p>
                       </div>
                     </div>
                   )}
-                </div>
+              </div>
 
-                <div className="flex flex-col justify-between rounded-[20px] bg-black/35 p-5 text-white">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75">
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 to-transparent px-5 pb-5 pt-20 sm:px-8 sm:pb-8">
+                <div className="mx-auto flex max-w-[2200px] items-end justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/70">
                       {selectedMedia.albumId ? albumNameById.get(selectedMedia.albumId) : "My Photos"}
                     </p>
-                    <h3 className="mt-3 text-2xl font-semibold">{selectedMedia.fileName}</h3>
-                    <p className="mt-3 text-sm leading-6 text-white/75">
-                      Full view open hai. Background blur rakha gaya hai taaki photo focus me lage aur page clean dikhe.
-                    </p>
+                    <h3 className="mt-2 max-w-[70vw] truncate font-serif text-xl sm:text-2xl">{selectedMedia.fileName}</h3>
                   </div>
-
-                  <div className="mt-6 flex flex-wrap gap-3">
+                  <div className="pointer-events-auto shrink-0">
                     <form action={toggleFavoriteAction.bind(null, event.slug, selectedMedia.id)}>
                       <button
                         type="submit"
-                        className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
-                          favoriteIds.has(selectedMedia.id) ? "bg-rust text-white" : "bg-white/15 text-white hover:bg-white/25"
+                        className={`inline-flex h-10 items-center gap-2 rounded-full border border-white/30 px-4 text-xs font-semibold backdrop-blur-md transition ${
+                          favoriteIds.has(selectedMedia.id) ? "bg-rust text-white" : "bg-black/25 text-white hover:bg-white hover:text-ink"
                         }`}
                       >
                         <Heart size={16} />
                         {favoriteIds.has(selectedMedia.id) ? "Saved" : "Save Favorite"}
                       </button>
                     </form>
-                    <Link
-                      href={galleryHref(event.slug, selectedView)}
-                      className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/25"
-                    >
-                      <X size={16} />
-                      Close
-                    </Link>
                   </div>
                 </div>
-              </div>
             </div>
-          </div>
+        </div>
         </div>
       ) : null}
     </main>
