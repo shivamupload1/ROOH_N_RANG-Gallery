@@ -5,7 +5,12 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, "../.."),
   turbopack: { root: path.join(__dirname, "../..") },
   transpilePackages: ["@rooh/database"],
-  images: { remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com" }] }
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "**.supabase.co" }
+    ]
+  }
 };
 
 export default nextConfig;

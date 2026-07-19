@@ -9,8 +9,10 @@ import { prisma } from "@/lib/db";
 import { eventCoverKey, parseEventCoverMediaId } from "@/lib/event-cover";
 import { parseSelectionSubmission, selectionSubmissionKey } from "@/lib/selection-submissions";
 import { getSiteBrand } from "@/lib/site-content";
+import { createSupabaseServiceClient } from "@/lib/supabase-service";
 
 export const dynamic = "force-dynamic";
+const GALLERY_BATCH_SIZE = 40;
 
 function isExpired(expiryDate?: Date | null) {
   return Boolean(expiryDate && expiryDate.getTime() < Date.now());
@@ -32,7 +34,7 @@ function compareMediaByFileName(a: { fileName: string }, b: { fileName: string }
   return a.fileName.localeCompare(b.fileName, "en", { numeric: true, sensitivity: "base" });
 }
 
-function galleryHref(eventSlug: string, view: string, mediaId?: string | null) {
+function galleryHref(eventSlug: string, view: string, mediaId?: string | null, page?: number) {
   const params = new URLSearchParams();
 
   if (view !== "all") {
@@ -43,8 +45,47 @@ function galleryHref(eventSlug: string, view: string, mediaId?: string | null) {
     params.set("media", mediaId);
   }
 
+  if (page && page > 1) {
+    params.set("page", String(page));
+  }
+
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
   return `/gallery/${eventSlug}${suffix}`;
+}
+
+async function createPreviewUrlMap(mediaFiles: Array<{ id: string; previewStoragePath: string | null }>) {
+  const previewUrlById = new Map<string, string>();
+  const idByPath = new Map<string, string>();
+
+  for (const mediaFile of mediaFiles) {
+    if (mediaFile.previewStoragePath) {
+      idByPath.set(mediaFile.previewStoragePath, mediaFile.id);
+    }
+  }
+
+  const paths = [...idByPath.keys()];
+  const supabase = createSupabaseServiceClient();
+  if (!supabase || paths.length === 0) return previewUrlById;
+
+  try {
+    for (let index = 0; index < paths.length; index += 100) {
+      const batch = paths.slice(index, index + 100);
+      const { data, error } = await supabase.storage
+        .from(process.env.SUPABASE_PREVIEW_BUCKET || "gallery-previews")
+        .createSignedUrls(batch, 3600);
+
+      if (error || !data) continue;
+
+      for (const preview of data) {
+        const mediaId = preview.path ? idByPath.get(preview.path) : null;
+        if (mediaId && preview.signedUrl) previewUrlById.set(mediaId, preview.signedUrl);
+      }
+    }
+  } catch {
+    // The authenticated media route remains the fallback when Storage signing is unavailable.
+  }
+
+  return previewUrlById;
 }
 
 export default async function GalleryPage({
@@ -52,10 +93,10 @@ export default async function GalleryPage({
   searchParams
 }: {
   params: Promise<{ eventSlug: string }>;
-  searchParams: Promise<{ error?: string; selection?: string; view?: string; media?: string }>;
+  searchParams: Promise<{ error?: string; selection?: string; view?: string; media?: string; page?: string }>;
 }) {
   const { eventSlug } = await params;
-  const { error, selection, view, media } = await searchParams;
+  const { error, selection, view, media, page } = await searchParams;
   const brand = await getSiteBrand();
   const event = await prisma.event.findUnique({
     where: { slug: eventSlug },
@@ -172,14 +213,22 @@ export default async function GalleryPage({
         : selectedView === "all"
           ? allMedia
           : visibleAlbums.find((album) => album.slug === selectedView)?.mediaFiles || [];
+  const parsedPage = Number.parseInt(page || "1", 10);
+  const currentPage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const displayedMedia = activeMedia.slice(0, currentPage * GALLERY_BATCH_SIZE);
+  const hasMoreMedia = displayedMedia.length < activeMedia.length;
   const heroMedia =
     allMedia.find((mediaFile) => mediaFile.id === coverMediaId) ||
     highlightMedia.find((mediaFile) => mediaFile.mediaType === "PHOTO") ||
     allMedia.find((mediaFile) => mediaFile.mediaType === "PHOTO") ||
     allMedia[0];
-  const heroImageSrc = heroMedia ? `/api/media/${heroMedia.id}` : null;
   const selectedMedia = media ? allMedia.find((mediaFile) => mediaFile.id === media) || null : null;
-  const selectedMediaHref = selectedMedia ? `/api/media/${selectedMedia.id}` : null;
+  const previewUrlById = await createPreviewUrlMap(
+    [...displayedMedia, ...(heroMedia ? [heroMedia] : []), ...(selectedMedia ? [selectedMedia] : [])]
+      .filter((mediaFile, index, list) => list.findIndex((candidate) => candidate.id === mediaFile.id) === index)
+  );
+  const heroImageSrc = heroMedia ? previewUrlById.get(heroMedia.id) || `/api/media/${heroMedia.id}` : null;
+  const selectedMediaHref = selectedMedia ? previewUrlById.get(selectedMedia.id) || `/api/media/${selectedMedia.id}` : null;
   const heroMeta = [event.city, formatEventDate(event.eventDate)].filter(Boolean).join(" / ");
 
   return (
@@ -284,16 +333,18 @@ export default async function GalleryPage({
               : "No photos are available in this section yet. Sync the Drive folder from the admin panel after adding subfolders and images."}
           </div>
         ) : (
-          <div className="columns-2 md:columns-3 xl:columns-4 2xl:columns-5 min-[2400px]:columns-6 [column-gap:6px]">
-            {activeMedia.map((mediaFile) => {
+          <div id="gallery-grid" className="columns-2 md:columns-3 xl:columns-4 2xl:columns-5 min-[2400px]:columns-6 [column-gap:6px]">
+            {displayedMedia.map((mediaFile) => {
               const isFavorite = favoriteIds.has(mediaFile.id);
               const canDownload = event.downloadAllowed && mediaFile.downloadAllowed;
-              const imageSrc = mediaFile.mediaType === "PHOTO" || mediaFile.thumbnailUrl ? `/api/media/${mediaFile.id}` : null;
+              const imageSrc = mediaFile.mediaType === "PHOTO" || mediaFile.thumbnailUrl
+                ? previewUrlById.get(mediaFile.id) || `/api/media/${mediaFile.id}`
+                : null;
               const albumLabel = mediaFile.albumId ? albumNameById.get(mediaFile.albumId) : "My Photos";
 
               return (
                 <article key={mediaFile.id} className="group relative mb-[6px] break-inside-avoid overflow-hidden bg-[#ecebe7]">
-                    <Link href={galleryHref(event.slug, selectedView, mediaFile.id)} className="block bg-ink/10">
+                    <Link href={galleryHref(event.slug, selectedView, mediaFile.id, currentPage)} className="block bg-ink/10">
                       {imageSrc ? (
                         <Image
                           src={imageSrc}
@@ -302,6 +353,8 @@ export default async function GalleryPage({
                           height={mediaFile.height || 1200}
                           sizes="(min-width: 2400px) 16vw, (min-width: 1536px) 20vw, (min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
                           unoptimized
+                          loading="lazy"
+                          decoding="async"
                           className="block h-auto w-full object-cover transition duration-700 ease-out group-hover:scale-[1.015]"
                         />
                       ) : (
@@ -342,6 +395,20 @@ export default async function GalleryPage({
             })}
           </div>
         )}
+
+        {hasMoreMedia ? (
+          <div className="flex flex-col items-center gap-3 py-12">
+            <Link
+              href={`${galleryHref(event.slug, selectedView, null, currentPage + 1)}#gallery-grid`}
+              className="inline-flex min-h-11 items-center justify-center border border-ink px-8 text-[11px] font-bold uppercase tracking-[0.12em] text-ink transition hover:bg-ink hover:text-white"
+            >
+              Load more photographs
+            </Link>
+            <p className="text-[10px] uppercase tracking-[0.1em] text-ink/45">
+              Showing {displayedMedia.length} of {activeMedia.length}
+            </p>
+          </div>
+        ) : null}
       </section>
 
       <section className="border-t border-ink/10 bg-[#f1eee6]">
@@ -396,7 +463,7 @@ export default async function GalleryPage({
                   </Link>
                 ) : null}
                 <Link
-                  href={galleryHref(event.slug, selectedView)}
+                  href={galleryHref(event.slug, selectedView, null, currentPage)}
                   className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/25 bg-black/25 text-white backdrop-blur-md transition hover:bg-white hover:text-ink"
                   title="Close preview"
                 >
@@ -413,6 +480,7 @@ export default async function GalleryPage({
                       height={selectedMedia.height || 1400}
                       sizes="96vw"
                       unoptimized
+                      priority
                       className="h-auto max-h-[96svh] w-auto max-w-[96vw] object-contain"
                     />
                   ) : (
