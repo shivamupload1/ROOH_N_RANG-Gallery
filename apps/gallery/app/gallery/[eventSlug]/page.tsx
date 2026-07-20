@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowDown, Download, Heart, LockKeyhole, Play, Send, X } from "lucide-react";
 import { submitSelectionAction, toggleFavoriteAction, verifyGalleryPinAction } from "@/app/gallery/[eventSlug]/actions";
 import { FormField } from "@/components/admin/form-field";
+import { GalleryMediaCard } from "@/components/gallery-media-card";
 import { GalleryShareButton } from "@/components/gallery-share-button";
 import { getGallerySession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -307,57 +308,15 @@ export default async function GalleryPage({
           <div id="gallery-grid" className="columns-2 md:columns-3 xl:columns-4 2xl:columns-5 min-[2400px]:columns-6 [column-gap:6px]">
             {displayedMedia.map((mediaFile) => {
               const isFavorite = favoriteIds.has(mediaFile.id);
-              const canDownload = event.downloadAllowed && mediaFile.downloadAllowed;
-              const imageSrc = mediaFile.mediaType === "PHOTO" || mediaFile.thumbnailUrl ? `/api/media/${mediaFile.id}` : null;
 
-              return (
-                <article key={mediaFile.id} className="group relative mb-[6px] break-inside-avoid overflow-hidden bg-[#ecebe7]">
-                    <Link href={galleryHref(basePath, selectedView, mediaFile.id, currentPage)} scroll={false} className="block overflow-hidden bg-ink/10">
-                      {imageSrc ? (
-                        <Image
-                          src={imageSrc}
-                          alt={mediaFile.fileName}
-                          width={mediaFile.width || 1600}
-                          height={mediaFile.height || 1200}
-                          sizes="(min-width: 2400px) 16vw, (min-width: 1536px) 20vw, (min-width: 1280px) 25vw, (min-width: 768px) 33vw, 50vw"
-                          unoptimized
-                          loading="lazy"
-                          decoding="async"
-                          className="block h-auto w-full object-cover transition-transform duration-1000 ease-out will-change-transform group-hover:scale-[1.055]"
-                        />
-                      ) : (
-                        <div className="flex aspect-[4/3] items-center justify-center bg-ink text-white">
-                          <Play size={28} />
-                        </div>
-                      )}
-                      <span className="pointer-events-none absolute inset-0 bg-black/10 opacity-0 transition duration-500 group-hover:opacity-100" />
-                    </Link>
-
-                    <div className="absolute right-2 top-2 z-20 flex gap-1.5 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
-                      <form action={toggleFavoriteAction.bind(null, event.slug, basePath, mediaFile.id)}>
-                        <button
-                          type="submit"
-                          className={`grid h-9 w-9 place-items-center rounded-full border border-white/[0.35] backdrop-blur-md transition ${
-                            isFavorite ? "bg-rust text-white" : "bg-black/[0.35] text-white hover:bg-white hover:text-ink"
-                          }`}
-                          title={isFavorite ? "Remove favorite" : "Save favorite"}
-                        >
-                          <Heart size={16} fill={isFavorite ? "currentColor" : "none"} />
-                        </button>
-                      </form>
-                      {canDownload ? (
-                        <a
-                          href={`/download/${mediaFile.id}`}
-                          download
-                          className="grid h-9 w-9 place-items-center rounded-full border border-white/[0.35] bg-black/[0.35] text-white backdrop-blur-md transition hover:bg-white hover:text-ink"
-                          title="Download"
-                        >
-                          <Download size={16} />
-                        </a>
-                      ) : null}
-                    </div>
-                </article>
-              );
+              return <GalleryMediaCard
+                key={mediaFile.id}
+                media={mediaFile}
+                eventSlug={event.slug}
+                basePath={basePath}
+                eventDownloadsAllowed={event.downloadAllowed}
+                initialFavorite={isFavorite}
+              />;
             })}
           </div>
         )}
