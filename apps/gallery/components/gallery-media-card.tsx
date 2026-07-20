@@ -75,6 +75,7 @@ export function GalleryMediaCard({
               type="button"
               onClick={toggleFavorite}
               disabled={isPending}
+              aria-pressed={isFavorite}
               className="grid h-11 w-11 place-items-center rounded-full border border-white/30 bg-black/[0.28] text-white backdrop-blur-md transition hover:bg-black/45"
               title={isFavorite ? "Remove favorite" : "Save favorite"}
             >
@@ -133,6 +134,7 @@ export function GalleryMediaCard({
           type="button"
           onClick={toggleFavorite}
           disabled={isPending}
+          aria-pressed={isFavorite}
           className="grid h-9 w-9 place-items-center rounded-full border border-white/[0.35] bg-black/[0.35] text-white backdrop-blur-md transition hover:bg-black/50"
           title={isFavorite ? "Remove favorite" : "Save favorite"}
         >

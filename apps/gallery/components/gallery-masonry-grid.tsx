@@ -72,8 +72,17 @@ export function GalleryMasonryGrid({
 
   const columns = useMemo(() => {
     const nextColumns = Array.from({ length: columnCount }, () => [] as GalleryMedia[]);
+    const estimatedHeights = Array.from({ length: columnCount }, () => 0);
+
     visibleMedia.forEach((item, index) => {
-      nextColumns[index % columnCount].push(item);
+      const targetColumn = index < columnCount
+        ? index
+        : estimatedHeights.indexOf(Math.min(...estimatedHeights));
+      const width = item.width && item.width > 0 ? item.width : 4;
+      const height = item.height && item.height > 0 ? item.height : 3;
+
+      nextColumns[targetColumn].push(item);
+      estimatedHeights[targetColumn] += height / width;
     });
     return nextColumns;
   }, [columnCount, visibleMedia]);
@@ -83,13 +92,13 @@ export function GalleryMasonryGrid({
       <div
         ref={gridRef}
         id="gallery-grid"
-        className="grid w-full items-stretch gap-[4px]"
+        className="grid w-full items-start gap-[4px] px-[4px]"
         style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
       >
         {columns.map((column, columnIndex) => (
           <div
             key={columnIndex}
-            className={`flex min-w-0 flex-col gap-[4px] ${isComplete ? "justify-between" : "justify-start"}`}
+            className="flex min-w-0 flex-col gap-[4px]"
           >
             {column.map((mediaFile) => (
               <GalleryMediaCard
