@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowDown, Download, Heart, LockKeyhole, Play, Send, X } from "lucide-react";
+import { ArrowDown, ChevronLeft, ChevronRight, Download, Heart, LockKeyhole, Play, Send, X } from "lucide-react";
 import type { CSSProperties } from "react";
 import { submitSelectionAction, toggleFavoriteAction, verifyGalleryPinAction } from "@/app/gallery/[eventSlug]/actions";
 import { FormField } from "@/components/admin/form-field";
@@ -13,6 +13,7 @@ import { parseSelectionSubmission, selectionSubmissionKey } from "@/lib/selectio
 import { getSiteBrand } from "@/lib/site-content";
 
 export const dynamic = "force-dynamic";
+const GALLERY_PAGE_SIZE = 150;
 
 function isExpired(expiryDate?: Date | null) {
   return Boolean(expiryDate && expiryDate.getTime() < Date.now());
@@ -189,7 +190,22 @@ export default async function GalleryPage({
           ? allMedia
           : visibleAlbums.find((album) => album.slug === selectedView)?.mediaFiles || [];
   const parsedPage = Number.parseInt(page || "1", 10);
-  const currentPage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const requestedPage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const totalPages = Math.max(1, Math.ceil(activeMedia.length / GALLERY_PAGE_SIZE));
+  const currentPage = Math.min(requestedPage, totalPages);
+  const galleryMedia = activeMedia.map((mediaFile) => ({
+    id: mediaFile.id,
+    fileName: mediaFile.fileName,
+    width: mediaFile.width,
+    height: mediaFile.height,
+    mediaType: mediaFile.mediaType,
+    thumbnailUrl: mediaFile.thumbnailUrl,
+    downloadAllowed: mediaFile.downloadAllowed
+  }));
+  const pageMedia = galleryMedia.slice(
+    (currentPage - 1) * GALLERY_PAGE_SIZE,
+    currentPage * GALLERY_PAGE_SIZE
+  );
   const heroMedia =
     allMedia.find((mediaFile) => mediaFile.id === coverMediaId) ||
     highlightMedia.find((mediaFile) => mediaFile.mediaType === "PHOTO") ||
@@ -309,22 +325,68 @@ export default async function GalleryPage({
           </div>
         ) : (
           <GalleryMasonryGrid
-            key={selectedView}
-            media={activeMedia.map((mediaFile) => ({
-              id: mediaFile.id,
-              fileName: mediaFile.fileName,
-              width: mediaFile.width,
-              height: mediaFile.height,
-              mediaType: mediaFile.mediaType,
-              thumbnailUrl: mediaFile.thumbnailUrl,
-              downloadAllowed: mediaFile.downloadAllowed
-            }))}
+            key={`${selectedView}-${currentPage}`}
+            media={pageMedia}
+            navigationMedia={galleryMedia}
             favoriteIds={[...favoriteIds]}
             eventSlug={event.slug}
             basePath={basePath}
             eventDownloadsAllowed={event.downloadAllowed}
           />
         )}
+
+        {activeMedia.length > 0 && totalPages > 1 ? (
+          <nav className="mx-auto mt-12 flex max-w-[2400px] items-center justify-center gap-3 overflow-x-auto px-4 pb-2" aria-label="Gallery pages">
+            {currentPage > 1 ? (
+              <Link
+                href={`${galleryHref(basePath, selectedView, null, currentPage - 1)}#gallery-grid`}
+                className="group grid h-10 w-10 shrink-0 place-items-center rounded-full border border-ink/15 text-ink/60 transition hover:border-ink hover:bg-ink hover:text-white"
+                title="Previous page"
+              >
+                <ChevronLeft className="transition-transform group-hover:-translate-x-0.5" size={19} />
+              </Link>
+            ) : (
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-ink/10 text-ink/20" aria-hidden="true">
+                <ChevronLeft size={19} />
+              </span>
+            )}
+
+            <div className="flex items-center gap-2">
+              {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => {
+                const isCurrent = pageNumber === currentPage;
+
+                return (
+                  <Link
+                    key={pageNumber}
+                    href={`${galleryHref(basePath, selectedView, null, pageNumber)}#gallery-grid`}
+                    aria-current={isCurrent ? "page" : undefined}
+                    className={`grid shrink-0 place-items-center rounded-full font-semibold transition ${
+                      isCurrent
+                        ? "h-11 w-11 bg-[#6f7350] text-base text-white shadow-[0_8px_24px_rgba(76,79,53,0.22)]"
+                        : "h-9 w-9 text-xs text-ink/50 hover:bg-ink/5 hover:text-ink"
+                    }`}
+                  >
+                    {pageNumber}
+                  </Link>
+                );
+              })}
+            </div>
+
+            {currentPage < totalPages ? (
+              <Link
+                href={`${galleryHref(basePath, selectedView, null, currentPage + 1)}#gallery-grid`}
+                className="group grid h-10 w-10 shrink-0 place-items-center rounded-full border border-ink/15 text-ink/60 transition hover:border-ink hover:bg-ink hover:text-white"
+                title="Next page"
+              >
+                <ChevronRight className="transition-transform group-hover:translate-x-0.5" size={19} />
+              </Link>
+            ) : (
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-ink/10 text-ink/20" aria-hidden="true">
+                <ChevronRight size={19} />
+              </span>
+            )}
+          </nav>
+        ) : null}
       </section>
 
       <section className="border-t border-ink/10 bg-[#f1eee6]">
