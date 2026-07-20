@@ -1,9 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowDown, Download, Heart, LockKeyhole, Play, Send, X } from "lucide-react";
+import type { CSSProperties } from "react";
 import { submitSelectionAction, toggleFavoriteAction, verifyGalleryPinAction } from "@/app/gallery/[eventSlug]/actions";
 import { FormField } from "@/components/admin/form-field";
-import { GalleryMediaCard } from "@/components/gallery-media-card";
+import { GalleryMasonryGrid } from "@/components/gallery-masonry-grid";
 import { GalleryShareButton } from "@/components/gallery-share-button";
 import { getGallerySession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -12,7 +13,6 @@ import { parseSelectionSubmission, selectionSubmissionKey } from "@/lib/selectio
 import { getSiteBrand } from "@/lib/site-content";
 
 export const dynamic = "force-dynamic";
-const GALLERY_BATCH_SIZE = 40;
 
 function isExpired(expiryDate?: Date | null) {
   return Boolean(expiryDate && expiryDate.getTime() < Date.now());
@@ -190,8 +190,6 @@ export default async function GalleryPage({
           : visibleAlbums.find((album) => album.slug === selectedView)?.mediaFiles || [];
   const parsedPage = Number.parseInt(page || "1", 10);
   const currentPage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
-  const displayedMedia = activeMedia.slice(0, currentPage * GALLERY_BATCH_SIZE);
-  const hasMoreMedia = displayedMedia.length < activeMedia.length;
   const heroMedia =
     allMedia.find((mediaFile) => mediaFile.id === coverMediaId) ||
     highlightMedia.find((mediaFile) => mediaFile.mediaType === "PHOTO") ||
@@ -213,8 +211,13 @@ export default async function GalleryPage({
             priority
             unoptimized
             sizes="100vw"
-            className="absolute inset-0 object-cover"
-            style={{ objectPosition: `${cover.positionX}% ${cover.positionY}%` }}
+            className="gallery-cover-position absolute inset-0 object-cover"
+            style={{
+              "--cover-desktop-x": `${cover.desktopPositionX}%`,
+              "--cover-desktop-y": `${cover.desktopPositionY}%`,
+              "--cover-mobile-x": `${cover.mobilePositionX}%`,
+              "--cover-mobile-y": `${cover.mobilePositionY}%`
+            } as CSSProperties}
           />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-[#171414] via-[#40372f] to-[#74765c]" />
@@ -286,8 +289,8 @@ export default async function GalleryPage({
         </div>
       </section>
 
-      <section className="mx-auto max-w-[2400px] px-2 py-8 sm:px-3 lg:px-5 lg:py-12">
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4 px-2 sm:px-4">
+      <section className="w-full py-8 lg:py-12">
+        <div className="mx-auto mb-8 flex max-w-[2400px] flex-wrap items-end justify-between gap-4 px-5 sm:px-8 lg:px-12">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-rust">{brand.name} Stories</p>
             <h2 className="mt-2 font-serif text-3xl text-ink sm:text-4xl">{activeTab?.label || "Gallery"}</h2>
@@ -299,41 +302,29 @@ export default async function GalleryPage({
         </div>
 
         {activeMedia.length === 0 ? (
-          <div className="rounded-lg border border-ink/10 bg-ivory px-5 py-10 text-center text-sm text-ink/60">
+          <div className="mx-5 rounded-lg border border-ink/10 bg-ivory px-5 py-10 text-center text-sm text-ink/60 sm:mx-8 lg:mx-12">
             {selectedView === "favorites"
               ? "No favorites saved yet. Tap the heart on any photo to keep it here."
               : "No photos are available in this section yet. Sync the Drive folder from the admin panel after adding subfolders and images."}
           </div>
         ) : (
-          <div id="gallery-grid" className="columns-2 md:columns-3 xl:columns-4 2xl:columns-5 min-[2400px]:columns-6 [column-gap:6px]">
-            {displayedMedia.map((mediaFile) => {
-              const isFavorite = favoriteIds.has(mediaFile.id);
-
-              return <GalleryMediaCard
-                key={mediaFile.id}
-                media={mediaFile}
-                eventSlug={event.slug}
-                basePath={basePath}
-                eventDownloadsAllowed={event.downloadAllowed}
-                initialFavorite={isFavorite}
-              />;
-            })}
-          </div>
+          <GalleryMasonryGrid
+            key={selectedView}
+            media={activeMedia.map((mediaFile) => ({
+              id: mediaFile.id,
+              fileName: mediaFile.fileName,
+              width: mediaFile.width,
+              height: mediaFile.height,
+              mediaType: mediaFile.mediaType,
+              thumbnailUrl: mediaFile.thumbnailUrl,
+              downloadAllowed: mediaFile.downloadAllowed
+            }))}
+            favoriteIds={[...favoriteIds]}
+            eventSlug={event.slug}
+            basePath={basePath}
+            eventDownloadsAllowed={event.downloadAllowed}
+          />
         )}
-
-        {hasMoreMedia ? (
-          <div className="flex flex-col items-center gap-3 py-12">
-            <Link
-              href={`${galleryHref(basePath, selectedView, null, currentPage + 1)}#gallery-grid`}
-              className="inline-flex min-h-11 items-center justify-center border border-ink px-8 text-[11px] font-bold uppercase tracking-[0.12em] text-ink transition hover:bg-ink hover:text-white"
-            >
-              Load more photographs
-            </Link>
-            <p className="text-[10px] uppercase tracking-[0.1em] text-ink/45">
-              Showing {displayedMedia.length} of {activeMedia.length}
-            </p>
-          </div>
-        ) : null}
       </section>
 
       <section className="border-t border-ink/10 bg-[#f1eee6]">
@@ -375,7 +366,7 @@ export default async function GalleryPage({
       </section>
 
       {selectedMedia && selectedMediaHref ? (
-        <div className="fixed inset-0 z-50 bg-black/60 text-white backdrop-blur-2xl">
+        <div className="fixed inset-0 z-50 bg-black/30 text-white backdrop-blur-[12px]">
           <div className="relative flex h-[100svh] w-full items-center justify-center overflow-hidden p-3 sm:p-6">
               {selectedMedia.mediaType === "PHOTO" ? (
                 <Image
@@ -384,10 +375,10 @@ export default async function GalleryPage({
                   fill
                   unoptimized
                   sizes="100vw"
-                  className="pointer-events-none absolute inset-0 scale-110 object-cover opacity-20 blur-3xl"
+                  className="pointer-events-none absolute inset-0 scale-110 object-cover opacity-20 blur-2xl"
                 />
               ) : null}
-              <div className="pointer-events-none absolute inset-0 bg-black/45" />
+              <div className="pointer-events-none absolute inset-0 bg-black/30" />
               <div className="absolute right-4 top-4 z-20 flex items-center gap-2 sm:right-6 sm:top-6">
                 {event.downloadAllowed && selectedMedia.downloadAllowed ? (
                   <a
@@ -442,11 +433,13 @@ export default async function GalleryPage({
                     <form action={toggleFavoriteAction.bind(null, event.slug, basePath, selectedMedia.id)}>
                       <button
                         type="submit"
-                        className={`inline-flex h-10 items-center gap-2 rounded-full border border-white/30 px-4 text-xs font-semibold backdrop-blur-md transition ${
-                          favoriteIds.has(selectedMedia.id) ? "bg-rust text-white" : "bg-black/25 text-white hover:bg-white hover:text-ink"
-                        }`}
+                        className="inline-flex h-10 items-center gap-2 rounded-full border border-white/30 bg-black/[0.28] px-4 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/45"
                       >
-                        <Heart size={16} />
+                        <Heart
+                          className={favoriteIds.has(selectedMedia.id) ? "text-[#e0444f]" : "text-white"}
+                          size={16}
+                          fill={favoriteIds.has(selectedMedia.id) ? "currentColor" : "none"}
+                        />
                         {favoriteIds.has(selectedMedia.id) ? "Saved" : "Save Favorite"}
                       </button>
                     </form>

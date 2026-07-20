@@ -66,21 +66,19 @@ export function GalleryMediaCard({
 
   const lightbox = isOpen && imageSrc
     ? createPortal(
-        <div className="fixed inset-0 z-[100] bg-black/60 text-white backdrop-blur-2xl" role="dialog" aria-modal="true" aria-label={media.fileName}>
-          <Image src={imageSrc} alt="" fill unoptimized sizes="100vw" className="pointer-events-none absolute inset-0 scale-110 object-cover opacity-20 blur-3xl" />
-          <div className="pointer-events-none absolute inset-0 bg-black/45" />
+        <div className="fixed inset-0 z-[100] bg-black/30 text-white backdrop-blur-[12px]" role="dialog" aria-modal="true" aria-label={media.fileName}>
+          <Image src={imageSrc} alt="" fill unoptimized sizes="100vw" className="pointer-events-none absolute inset-0 scale-110 object-cover opacity-20 blur-2xl" />
+          <div className="pointer-events-none absolute inset-0 bg-black/30" />
 
           <div className="absolute right-4 top-4 z-30 flex items-center gap-2 sm:right-6 sm:top-6">
             <button
               type="button"
               onClick={toggleFavorite}
               disabled={isPending}
-              className={`grid h-11 w-11 place-items-center rounded-full border border-white/30 backdrop-blur-md transition ${
-                isFavorite ? "bg-rust text-white" : "bg-black/25 text-white hover:bg-white hover:text-ink"
-              }`}
+              className="grid h-11 w-11 place-items-center rounded-full border border-white/30 bg-black/[0.28] text-white backdrop-blur-md transition hover:bg-black/45"
               title={isFavorite ? "Remove favorite" : "Save favorite"}
             >
-              <Heart size={17} fill={isFavorite ? "currentColor" : "none"} />
+              <Heart className={isFavorite ? "text-[#e0444f]" : "text-white"} size={17} fill={isFavorite ? "currentColor" : "none"} />
             </button>
             {canDownload ? (
               <a href={`/download/${media.id}`} download className="grid h-11 w-11 place-items-center rounded-full border border-white/30 bg-black/25 text-white backdrop-blur-md transition hover:bg-white hover:text-ink" title="Download original">
@@ -110,7 +108,7 @@ export function GalleryMediaCard({
     : null;
 
   return (
-    <article className="group relative mb-[6px] break-inside-avoid overflow-hidden bg-[#ecebe7]">
+    <article className="group relative w-full overflow-hidden bg-[#ecebe7]">
       <button type="button" onClick={() => imageSrc && setIsOpen(true)} className="block w-full overflow-hidden bg-ink/10 text-left" aria-label={`Preview ${media.fileName}`}>
         {imageSrc ? (
           <Image
@@ -135,12 +133,10 @@ export function GalleryMediaCard({
           type="button"
           onClick={toggleFavorite}
           disabled={isPending}
-          className={`grid h-9 w-9 place-items-center rounded-full border border-white/[0.35] backdrop-blur-md transition ${
-            isFavorite ? "bg-rust text-white" : "bg-black/[0.35] text-white hover:bg-white hover:text-ink"
-          }`}
+          className="grid h-9 w-9 place-items-center rounded-full border border-white/[0.35] bg-black/[0.35] text-white backdrop-blur-md transition hover:bg-black/50"
           title={isFavorite ? "Remove favorite" : "Save favorite"}
         >
-          <Heart size={16} fill={isFavorite ? "currentColor" : "none"} />
+          <Heart className={isFavorite ? "text-[#e0444f]" : "text-white"} size={16} fill={isFavorite ? "currentColor" : "none"} />
         </button>
         {canDownload ? (
           <a href={`/download/${media.id}`} download className="grid h-9 w-9 place-items-center rounded-full border border-white/[0.35] bg-black/[0.35] text-white backdrop-blur-md transition hover:bg-white hover:text-ink" title="Download">

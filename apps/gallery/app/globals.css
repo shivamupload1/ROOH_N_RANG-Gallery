@@ -36,6 +36,16 @@ a {
   text-wrap: balance;
 }
 
+.gallery-cover-position {
+  object-position: var(--cover-mobile-x, 50%) var(--cover-mobile-y, 50%);
+}
+
+@media (min-width: 768px) {
+  .gallery-cover-position {
+    object-position: var(--cover-desktop-x, 50%) var(--cover-desktop-y, 50%);
+  }
+}
+
 .surface-line {
   background-image: linear-gradient(90deg, rgba(185, 144, 73, 0), rgba(185, 144, 73, 0.6), rgba(185, 144, 73, 0));
 }
