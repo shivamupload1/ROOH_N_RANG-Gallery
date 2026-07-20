@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { CheckSquare2, Download, Heart, Play, Square } from "lucide-react";
+import { Check, Download, Heart, Play } from "lucide-react";
 
 export type GalleryMediaItem = {
   id: string;
@@ -60,10 +60,12 @@ export function GalleryMediaCard({
         type="button"
         onClick={() => onToggleSelection(media.id)}
         aria-pressed={isSelected}
-        className="absolute bottom-2 left-2 z-20 grid h-9 w-9 place-items-center text-white drop-shadow-[0_2px_5px_rgba(0,0,0,0.9)] transition hover:scale-110"
+        className="absolute bottom-2 left-2 z-20 grid h-7 w-7 place-items-center drop-shadow-[0_2px_5px_rgba(0,0,0,0.9)] transition hover:scale-110"
         title={isSelected ? "Remove from selection" : "Select photo"}
       >
-        {isSelected ? <CheckSquare2 size={20} /> : <Square size={20} />}
+        <span className={`grid h-4 w-4 place-items-center rounded-full border transition ${isSelected ? "border-white bg-white text-ink" : "border-white bg-black/10 text-transparent"}`}>
+          {isSelected ? <Check size={11} strokeWidth={3} /> : null}
+        </span>
       </button>
 
       <div className="absolute bottom-2 right-2 z-20 flex gap-0.5 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">

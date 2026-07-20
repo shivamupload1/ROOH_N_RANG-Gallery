@@ -309,43 +309,43 @@ export function GalleryMasonryGrid({
         ))}
       </div>
       {selectedMediaIds.size > 0 ? (
-        <div className="fixed bottom-5 left-1/2 z-[60] flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-center gap-2 overflow-x-auto rounded-full border border-white/30 bg-[#171414]/45 px-4 py-2.5 text-white shadow-[0_16px_55px_rgba(0,0,0,0.32)] backdrop-blur-[18px] sm:gap-4 sm:px-5">
-          <span className="whitespace-nowrap text-sm font-medium">{selectedMediaIds.size} Selected</span>
+        <div className="fixed bottom-4 left-1/2 z-[60] flex max-w-[calc(100vw-20px)] -translate-x-1/2 items-center gap-1.5 overflow-x-auto rounded-full border border-white/30 bg-[#171414]/45 px-3.5 py-2 text-white shadow-[0_14px_45px_rgba(0,0,0,0.3)] backdrop-blur-[18px] sm:gap-3 sm:px-4">
+          <span className="whitespace-nowrap text-xs font-medium">{selectedMediaIds.size} Selected</span>
           <button
             type="button"
             onClick={() => setSelectedMediaIds(new Set())}
-            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-white/25 px-3 text-xs text-white/80 transition hover:bg-white hover:text-ink"
+            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-white/25 px-2.5 text-[11px] text-white/80 transition hover:bg-white hover:text-ink"
           >
-            <X size={14} />
+            <X size={12} />
             Clear
           </button>
-          <span className="h-6 w-px shrink-0 bg-white/25" />
+          <span className="h-5 w-px shrink-0 bg-white/25" />
           <button
             type="button"
             onClick={toggleCurrentPageSelection}
-            className="inline-flex h-9 shrink-0 items-center gap-2 px-2 text-sm text-white/85 transition hover:text-white"
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 px-1.5 text-xs text-white/85 transition hover:text-white"
           >
             Current page
-            <CheckSquare2 size={17} />
+            <CheckSquare2 size={15} />
           </button>
           <button
             type="button"
             onClick={downloadSelected}
             disabled={!navigationMedia.some((item) => selectedMediaIds.has(item.id) && eventDownloadsAllowed && item.downloadAllowed)}
-            className="inline-flex h-9 shrink-0 items-center gap-2 px-2 text-sm text-white/85 transition hover:text-white disabled:opacity-35"
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 px-1.5 text-xs text-white/85 transition hover:text-white disabled:opacity-35"
           >
             Download
-            <Download size={17} />
+            <Download size={15} />
           </button>
           <button
             type="button"
             onClick={favoriteSelected}
             disabled={isFavoritePending || [...selectedMediaIds].every((mediaId) => favoriteMediaIds.has(mediaId))}
-            className="inline-flex h-9 shrink-0 items-center gap-2 px-2 text-sm text-white/85 transition hover:text-[#e0444f] disabled:opacity-35"
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 px-1.5 text-xs text-white/85 transition hover:text-[#e0444f] disabled:opacity-35"
             title="Add selected photos to favorites"
           >
             Favorite
-            <Heart size={18} />
+            <Heart size={15} />
           </button>
         </div>
       ) : null}
