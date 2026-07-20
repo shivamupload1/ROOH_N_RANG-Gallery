@@ -4,11 +4,24 @@ export function eventCoverKey(eventId: string) {
   return `${EVENT_COVER_PREFIX}${eventId}`;
 }
 
-export function parseEventCoverMediaId(value: unknown) {
+function coverPosition(value: unknown) {
+  const position = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(position) ? Math.min(100, Math.max(0, position)) : 50;
+}
+
+export function parseEventCover(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
+    return { mediaFileId: null, positionX: 50, positionY: 50 };
   }
 
-  const mediaFileId = "mediaFileId" in value ? value.mediaFileId : null;
-  return typeof mediaFileId === "string" && mediaFileId.length > 0 ? mediaFileId : null;
+  const record = value as Record<string, unknown>;
+  return {
+    mediaFileId: typeof record.mediaFileId === "string" && record.mediaFileId.length > 0 ? record.mediaFileId : null,
+    positionX: coverPosition(record.positionX),
+    positionY: coverPosition(record.positionY)
+  };
+}
+
+export function parseEventCoverMediaId(value: unknown) {
+  return parseEventCover(value).mediaFileId;
 }

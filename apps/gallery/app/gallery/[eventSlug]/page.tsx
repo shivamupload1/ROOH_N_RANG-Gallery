@@ -6,10 +6,9 @@ import { FormField } from "@/components/admin/form-field";
 import { GalleryShareButton } from "@/components/gallery-share-button";
 import { getGallerySession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { eventCoverKey, parseEventCoverMediaId } from "@/lib/event-cover";
+import { eventCoverKey, parseEventCover } from "@/lib/event-cover";
 import { parseSelectionSubmission, selectionSubmissionKey } from "@/lib/selection-submissions";
 import { getSiteBrand } from "@/lib/site-content";
-import { createSupabaseServiceClient } from "@/lib/supabase-service";
 
 export const dynamic = "force-dynamic";
 const GALLERY_BATCH_SIZE = 40;
@@ -59,41 +58,6 @@ function galleryBasePath(eventSlug: string, candidate?: string) {
   }
 
   return `/gallery/${eventSlug}`;
-}
-
-async function createPreviewUrlMap(mediaFiles: Array<{ id: string; previewStoragePath: string | null }>) {
-  const previewUrlById = new Map<string, string>();
-  const idByPath = new Map<string, string>();
-
-  for (const mediaFile of mediaFiles) {
-    if (mediaFile.previewStoragePath) {
-      idByPath.set(mediaFile.previewStoragePath, mediaFile.id);
-    }
-  }
-
-  const paths = [...idByPath.keys()];
-  const supabase = createSupabaseServiceClient();
-  if (!supabase || paths.length === 0) return previewUrlById;
-
-  try {
-    for (let index = 0; index < paths.length; index += 100) {
-      const batch = paths.slice(index, index + 100);
-      const { data, error } = await supabase.storage
-        .from(process.env.SUPABASE_PREVIEW_BUCKET || "gallery-previews")
-        .createSignedUrls(batch, 3600);
-
-      if (error || !data) continue;
-
-      for (const preview of data) {
-        const mediaId = preview.path ? idByPath.get(preview.path) : null;
-        if (mediaId && preview.signedUrl) previewUrlById.set(mediaId, preview.signedUrl);
-      }
-    }
-  } catch {
-    // The authenticated media route remains the fallback when Storage signing is unavailable.
-  }
-
-  return previewUrlById;
 }
 
 export default async function GalleryPage({
@@ -189,7 +153,8 @@ export default async function GalleryPage({
   ]);
   const favoriteIds = new Set(favorites.map((favorite) => favorite.mediaFileId));
   const savedSelection = parseSelectionSubmission(selectionRecord?.value);
-  const coverMediaId = parseEventCoverMediaId(coverRecord?.value);
+  const cover = parseEventCover(coverRecord?.value);
+  const coverMediaId = cover.mediaFileId;
 
   const rootMedia = [...event.mediaFiles].sort(compareMediaByFileName);
   const visibleAlbums = event.albums
@@ -232,12 +197,8 @@ export default async function GalleryPage({
     allMedia.find((mediaFile) => mediaFile.mediaType === "PHOTO") ||
     allMedia[0];
   const selectedMedia = media ? allMedia.find((mediaFile) => mediaFile.id === media) || null : null;
-  const previewUrlById = await createPreviewUrlMap(
-    [...displayedMedia, ...(heroMedia ? [heroMedia] : []), ...(selectedMedia ? [selectedMedia] : [])]
-      .filter((mediaFile, index, list) => list.findIndex((candidate) => candidate.id === mediaFile.id) === index)
-  );
-  const heroImageSrc = heroMedia ? previewUrlById.get(heroMedia.id) || `/api/media/${heroMedia.id}` : null;
-  const selectedMediaHref = selectedMedia ? previewUrlById.get(selectedMedia.id) || `/api/media/${selectedMedia.id}` : null;
+  const heroImageSrc = heroMedia ? `/api/media/${heroMedia.id}` : null;
+  const selectedMediaHref = selectedMedia ? `/api/media/${selectedMedia.id}` : null;
   const heroMeta = [event.city, formatEventDate(event.eventDate)].filter(Boolean).join(" / ");
 
   return (
@@ -251,7 +212,8 @@ export default async function GalleryPage({
             priority
             unoptimized
             sizes="100vw"
-            className="absolute inset-0 object-cover object-center"
+            className="absolute inset-0 object-cover"
+            style={{ objectPosition: `${cover.positionX}% ${cover.positionY}%` }}
           />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-[#171414] via-[#40372f] to-[#74765c]" />
@@ -346,14 +308,11 @@ export default async function GalleryPage({
             {displayedMedia.map((mediaFile) => {
               const isFavorite = favoriteIds.has(mediaFile.id);
               const canDownload = event.downloadAllowed && mediaFile.downloadAllowed;
-              const imageSrc = mediaFile.mediaType === "PHOTO" || mediaFile.thumbnailUrl
-                ? previewUrlById.get(mediaFile.id) || `/api/media/${mediaFile.id}`
-                : null;
-              const albumLabel = mediaFile.albumId ? albumNameById.get(mediaFile.albumId) : "My Photos";
+              const imageSrc = mediaFile.mediaType === "PHOTO" || mediaFile.thumbnailUrl ? `/api/media/${mediaFile.id}` : null;
 
               return (
                 <article key={mediaFile.id} className="group relative mb-[6px] break-inside-avoid overflow-hidden bg-[#ecebe7]">
-                    <Link href={galleryHref(basePath, selectedView, mediaFile.id, currentPage)} className="block bg-ink/10">
+                    <Link href={galleryHref(basePath, selectedView, mediaFile.id, currentPage)} scroll={false} className="block overflow-hidden bg-ink/10">
                       {imageSrc ? (
                         <Image
                           src={imageSrc}
@@ -364,20 +323,17 @@ export default async function GalleryPage({
                           unoptimized
                           loading="lazy"
                           decoding="async"
-                          className="block h-auto w-full object-cover transition duration-700 ease-out group-hover:scale-[1.015]"
+                          className="block h-auto w-full object-cover transition-transform duration-1000 ease-out will-change-transform group-hover:scale-[1.055]"
                         />
                       ) : (
                         <div className="flex aspect-[4/3] items-center justify-center bg-ink text-white">
                           <Play size={28} />
                         </div>
                       )}
-                      <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
-                      <span className="pointer-events-none absolute bottom-3 left-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-white opacity-0 transition group-hover:opacity-100">
-                        {albumLabel}
-                      </span>
+                      <span className="pointer-events-none absolute inset-0 bg-black/10 opacity-0 transition duration-500 group-hover:opacity-100" />
                     </Link>
 
-                    <div className="absolute right-2 top-2 flex gap-1.5 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
+                    <div className="absolute right-2 top-2 z-20 flex gap-1.5 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
                       <form action={toggleFavoriteAction.bind(null, event.slug, basePath, mediaFile.id)}>
                         <button
                           type="submit"
@@ -386,17 +342,18 @@ export default async function GalleryPage({
                           }`}
                           title={isFavorite ? "Remove favorite" : "Save favorite"}
                         >
-                          <Heart size={16} />
+                          <Heart size={16} fill={isFavorite ? "currentColor" : "none"} />
                         </button>
                       </form>
                       {canDownload ? (
-                        <Link
+                        <a
                           href={`/download/${mediaFile.id}`}
+                          download
                           className="grid h-9 w-9 place-items-center rounded-full border border-white/[0.35] bg-black/[0.35] text-white backdrop-blur-md transition hover:bg-white hover:text-ink"
                           title="Download"
                         >
                           <Download size={16} />
-                        </Link>
+                        </a>
                       ) : null}
                     </div>
                 </article>
@@ -459,17 +416,29 @@ export default async function GalleryPage({
       </section>
 
       {selectedMedia && selectedMediaHref ? (
-        <div className="fixed inset-0 z-50 bg-black/[0.96] text-white">
-          <div className="relative flex h-[100svh] w-full items-center justify-center overflow-hidden p-2 sm:p-5">
+        <div className="fixed inset-0 z-50 bg-black/60 text-white backdrop-blur-2xl">
+          <div className="relative flex h-[100svh] w-full items-center justify-center overflow-hidden p-3 sm:p-6">
+              {selectedMedia.mediaType === "PHOTO" ? (
+                <Image
+                  src={selectedMediaHref}
+                  alt=""
+                  fill
+                  unoptimized
+                  sizes="100vw"
+                  className="pointer-events-none absolute inset-0 scale-110 object-cover opacity-20 blur-3xl"
+                />
+              ) : null}
+              <div className="pointer-events-none absolute inset-0 bg-black/45" />
               <div className="absolute right-4 top-4 z-20 flex items-center gap-2 sm:right-6 sm:top-6">
                 {event.downloadAllowed && selectedMedia.downloadAllowed ? (
-                  <Link
+                  <a
                     href={`/download/${selectedMedia.id}`}
+                    download
                     className="inline-flex h-10 items-center gap-2 rounded-full border border-white/25 bg-black/25 px-4 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-white hover:text-ink"
                   >
                     <Download size={16} />
                     <span className="hidden sm:inline">Download</span>
-                  </Link>
+                  </a>
                 ) : null}
                 <Link
                   href={galleryHref(basePath, selectedView, null, currentPage)}
@@ -480,17 +449,17 @@ export default async function GalleryPage({
                 </Link>
               </div>
 
-              <div className="flex h-full w-full items-center justify-center">
+              <div className="relative z-10 flex h-full w-full items-center justify-center">
                   {selectedMedia.mediaType === "PHOTO" ? (
                     <Image
                       src={selectedMediaHref}
                       alt={selectedMedia.fileName}
                       width={selectedMedia.width || 2000}
                       height={selectedMedia.height || 1400}
-                      sizes="96vw"
+                      sizes="92vw"
                       unoptimized
                       priority
-                      className="h-auto max-h-[96svh] w-auto max-w-[96vw] object-contain"
+                      className="h-auto max-h-[90svh] w-auto max-w-[92vw] object-contain shadow-[0_28px_90px_rgba(0,0,0,0.45)]"
                     />
                   ) : (
                     <div className="flex min-h-[60vh] min-w-[70vw] items-center justify-center text-white">

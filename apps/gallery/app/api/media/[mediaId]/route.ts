@@ -57,7 +57,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return new NextResponse(assetBody, {
       headers: {
         "content-type": assetResponse.headers.get("content-type") || media.mimeType || "application/octet-stream",
-        "cache-control": "private, no-store, max-age=0"
+        "cache-control": "private, max-age=3600, stale-while-revalidate=86400"
       }
     });
   } catch {
