@@ -34,7 +34,7 @@ function compareMediaByFileName(a: { fileName: string }, b: { fileName: string }
   return a.fileName.localeCompare(b.fileName, "en", { numeric: true, sensitivity: "base" });
 }
 
-function galleryHref(eventSlug: string, view: string, mediaId?: string | null, page?: number) {
+function galleryHref(basePath: string, view: string, mediaId?: string | null, page?: number) {
   const params = new URLSearchParams();
 
   if (view !== "all") {
@@ -50,7 +50,15 @@ function galleryHref(eventSlug: string, view: string, mediaId?: string | null, p
   }
 
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
-  return `/gallery/${eventSlug}${suffix}`;
+  return `${basePath}${suffix}`;
+}
+
+function galleryBasePath(eventSlug: string, candidate?: string) {
+  if (candidate && /^\/[a-z0-9-]+\/(?:\d{4}-\d{2}-\d{2}|undated)\/[a-z0-9]{10}$/.test(candidate)) {
+    return candidate;
+  }
+
+  return `/gallery/${eventSlug}`;
 }
 
 async function createPreviewUrlMap(mediaFiles: Array<{ id: string; previewStoragePath: string | null }>) {
@@ -93,10 +101,11 @@ export default async function GalleryPage({
   searchParams
 }: {
   params: Promise<{ eventSlug: string }>;
-  searchParams: Promise<{ error?: string; selection?: string; view?: string; media?: string; page?: string }>;
+  searchParams: Promise<{ error?: string; selection?: string; view?: string; media?: string; page?: string; __base?: string }>;
 }) {
   const { eventSlug } = await params;
-  const { error, selection, view, media, page } = await searchParams;
+  const { error, selection, view, media, page, __base } = await searchParams;
+  const basePath = galleryBasePath(eventSlug, __base);
   const brand = await getSiteBrand();
   const event = await prisma.event.findUnique({
     where: { slug: eventSlug },
@@ -150,7 +159,7 @@ export default async function GalleryPage({
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-rust">{brand.name}</p>
           <h1 className="mt-3 text-3xl font-semibold">{event.name}</h1>
           <p className="mt-2 text-sm text-ink/60">{event.client.name} private gallery</p>
-          <form action={verifyGalleryPinAction.bind(null, event.slug)} className="mt-7 grid gap-4">
+          <form action={verifyGalleryPinAction.bind(null, event.slug, basePath)} className="mt-7 grid gap-4">
             <input type="hidden" name="eventId" value={event.id} />
             <FormField label="4 digit gallery PIN" name="pin" type="password" inputMode="numeric" minLength={4} maxLength={4} required />
             {error === "pin" ? <p className="rounded-md bg-rust/10 px-3 py-2 text-sm font-semibold text-rust">Wrong PIN. Please try again.</p> : null}
@@ -289,7 +298,7 @@ export default async function GalleryPage({
                 return (
                   <Link
                     key={tab.key}
-                    href={galleryHref(event.slug, tab.key)}
+                    href={galleryHref(basePath, tab.key)}
                     className={`relative inline-flex shrink-0 items-baseline gap-1.5 pb-1 text-[11px] font-bold uppercase tracking-[0.08em] transition after:absolute after:inset-x-0 after:-bottom-1 after:h-px after:origin-left after:bg-ink after:transition-transform ${
                       isActive
                         ? "text-ink after:scale-x-100"
@@ -307,7 +316,7 @@ export default async function GalleryPage({
               title={`${event.name} - ${brand.name}`}
               className="grid h-9 w-9 place-items-center text-ink/60 transition hover:text-ink"
             />
-            <Link href={galleryHref(event.slug, "favorites")} className="grid h-9 w-9 place-items-center text-ink/60 transition hover:text-rust" title="Favorites">
+            <Link href={galleryHref(basePath, "favorites")} className="grid h-9 w-9 place-items-center text-ink/60 transition hover:text-rust" title="Favorites">
               <Heart size={18} />
             </Link>
           </div>
@@ -344,7 +353,7 @@ export default async function GalleryPage({
 
               return (
                 <article key={mediaFile.id} className="group relative mb-[6px] break-inside-avoid overflow-hidden bg-[#ecebe7]">
-                    <Link href={galleryHref(event.slug, selectedView, mediaFile.id, currentPage)} className="block bg-ink/10">
+                    <Link href={galleryHref(basePath, selectedView, mediaFile.id, currentPage)} className="block bg-ink/10">
                       {imageSrc ? (
                         <Image
                           src={imageSrc}
@@ -369,7 +378,7 @@ export default async function GalleryPage({
                     </Link>
 
                     <div className="absolute right-2 top-2 flex gap-1.5 opacity-100 transition md:opacity-0 md:group-hover:opacity-100">
-                      <form action={toggleFavoriteAction.bind(null, event.slug, mediaFile.id)}>
+                      <form action={toggleFavoriteAction.bind(null, event.slug, basePath, mediaFile.id)}>
                         <button
                           type="submit"
                           className={`grid h-9 w-9 place-items-center rounded-full border border-white/[0.35] backdrop-blur-md transition ${
@@ -399,7 +408,7 @@ export default async function GalleryPage({
         {hasMoreMedia ? (
           <div className="flex flex-col items-center gap-3 py-12">
             <Link
-              href={`${galleryHref(event.slug, selectedView, null, currentPage + 1)}#gallery-grid`}
+              href={`${galleryHref(basePath, selectedView, null, currentPage + 1)}#gallery-grid`}
               className="inline-flex min-h-11 items-center justify-center border border-ink px-8 text-[11px] font-bold uppercase tracking-[0.12em] text-ink transition hover:bg-ink hover:text-white"
             >
               Load more photographs
@@ -438,7 +447,7 @@ export default async function GalleryPage({
                 ) : null}
               </div>
 
-              <form action={submitSelectionAction.bind(null, event.slug)}>
+              <form action={submitSelectionAction.bind(null, event.slug, basePath)}>
                 <button type="submit" className="inline-flex items-center gap-2 border border-ink bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-transparent hover:text-ink">
                   <Send size={17} />
                   {savedSelection ? "Resubmit Selection" : "Submit Selection"}
@@ -463,7 +472,7 @@ export default async function GalleryPage({
                   </Link>
                 ) : null}
                 <Link
-                  href={galleryHref(event.slug, selectedView, null, currentPage)}
+                  href={galleryHref(basePath, selectedView, null, currentPage)}
                   className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/25 bg-black/25 text-white backdrop-blur-md transition hover:bg-white hover:text-ink"
                   title="Close preview"
                 >
@@ -502,7 +511,7 @@ export default async function GalleryPage({
                     <h3 className="mt-2 max-w-[70vw] truncate font-serif text-xl sm:text-2xl">{selectedMedia.fileName}</h3>
                   </div>
                   <div className="pointer-events-auto shrink-0">
-                    <form action={toggleFavoriteAction.bind(null, event.slug, selectedMedia.id)}>
+                    <form action={toggleFavoriteAction.bind(null, event.slug, basePath, selectedMedia.id)}>
                       <button
                         type="submit"
                         className={`inline-flex h-10 items-center gap-2 rounded-full border border-white/30 px-4 text-xs font-semibold backdrop-blur-md transition ${

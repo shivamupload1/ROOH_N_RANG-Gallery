@@ -7,29 +7,44 @@ import { prisma } from "@/lib/db";
 import { selectionSubmissionKey } from "@/lib/selection-submissions";
 import { galleryPinSchema } from "@/lib/validators";
 
-export async function verifyGalleryPinAction(eventSlug: string, formData: FormData) {
+function galleryReturnPath(eventSlug: string, candidate: string) {
+  if (candidate.startsWith("/") && !candidate.startsWith("//") && !candidate.includes("?") && !candidate.includes("#")) {
+    return candidate;
+  }
+
+  return `/gallery/${eventSlug}`;
+}
+
+function galleryReturnUrl(path: string, query: Record<string, string>) {
+  const params = new URLSearchParams(query);
+  return params.size > 0 ? `${path}?${params.toString()}` : path;
+}
+
+export async function verifyGalleryPinAction(eventSlug: string, returnPath: string, formData: FormData) {
+  const safeReturnPath = galleryReturnPath(eventSlug, returnPath);
   const parsed = galleryPinSchema.parse(Object.fromEntries(formData));
   const event = await prisma.event.findUnique({ where: { id: parsed.eventId } });
 
   if (!event || event.slug !== eventSlug || !event.isPublished) {
-    redirect(`/gallery/${eventSlug}?error=unavailable`);
+    redirect(galleryReturnUrl(safeReturnPath, { error: "unavailable" }));
   }
 
   const matches = await verifySecret(parsed.pin, event.pinHash);
 
   if (!matches) {
-    redirect(`/gallery/${eventSlug}?error=pin`);
+    redirect(galleryReturnUrl(safeReturnPath, { error: "pin" }));
   }
 
   await createGallerySession(event.id);
-  redirect(`/gallery/${eventSlug}`);
+  redirect(safeReturnPath);
 }
 
-export async function toggleFavoriteAction(eventSlug: string, mediaFileId: string) {
+export async function toggleFavoriteAction(eventSlug: string, returnPath: string, mediaFileId: string) {
+  const safeReturnPath = galleryReturnPath(eventSlug, returnPath);
   const event = await prisma.event.findUnique({ where: { slug: eventSlug }, select: { id: true, accessMode: true } });
 
   if (!event) {
-    redirect(`/gallery/${eventSlug}`);
+    redirect(safeReturnPath);
   }
 
   let session = await getGallerySession(event.id);
@@ -39,7 +54,7 @@ export async function toggleFavoriteAction(eventSlug: string, mediaFileId: strin
   }
 
   if (!session) {
-    redirect(`/gallery/${eventSlug}`);
+    redirect(safeReturnPath);
   }
 
   const existing = await prisma.favorite.findFirst({
@@ -64,17 +79,19 @@ export async function toggleFavoriteAction(eventSlug: string, mediaFileId: strin
   }
 
   revalidatePath(`/gallery/${eventSlug}`);
+  revalidatePath(safeReturnPath);
   revalidatePath("/admin/favorites");
 }
 
-export async function submitSelectionAction(eventSlug: string) {
+export async function submitSelectionAction(eventSlug: string, returnPath: string) {
+  const safeReturnPath = galleryReturnPath(eventSlug, returnPath);
   const event = await prisma.event.findUnique({
     where: { slug: eventSlug },
     include: { client: true }
   });
 
   if (!event) {
-    redirect(`/gallery/${eventSlug}`);
+    redirect(safeReturnPath);
   }
 
   let session = await getGallerySession(event.id);
@@ -84,7 +101,7 @@ export async function submitSelectionAction(eventSlug: string) {
   }
 
   if (!session) {
-    redirect(`/gallery/${eventSlug}`);
+    redirect(safeReturnPath);
   }
 
   const favorites = await prisma.favorite.findMany({
@@ -104,7 +121,7 @@ export async function submitSelectionAction(eventSlug: string) {
   });
 
   if (favorites.length === 0) {
-    redirect(`/gallery/${eventSlug}?selection=empty`);
+    redirect(galleryReturnUrl(safeReturnPath, { selection: "empty" }));
   }
 
   const submissionValue = {
@@ -133,8 +150,9 @@ export async function submitSelectionAction(eventSlug: string) {
   });
 
   revalidatePath(`/gallery/${eventSlug}`);
+  revalidatePath(safeReturnPath);
   revalidatePath("/admin/favorites");
   revalidatePath("/admin/galleries");
   revalidatePath("/admin/events");
-  redirect(`/gallery/${eventSlug}?selection=submitted`);
+  redirect(galleryReturnUrl(safeReturnPath, { selection: "submitted" }));
 }
