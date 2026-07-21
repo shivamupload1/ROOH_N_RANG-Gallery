@@ -1,5 +1,7 @@
 import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 
+export const GALLERY_AUTH_NEXT_COOKIE = "rr_gallery_auth_next";
+
 export type GalleryViewer = {
   id: string;
   email: string;
@@ -12,6 +14,16 @@ export function safeInternalPath(candidate: string | null | undefined, fallback 
 
 export function gallerySignInHref(nextPath: string) {
   return `/auth/sign-in?next=${encodeURIComponent(safeInternalPath(nextPath))}`;
+}
+
+export function galleryPublicOrigin(requestOrigin: string) {
+  const configuredUrl = process.env.GALLERY_URL || process.env.NEXT_PUBLIC_GALLERY_URL;
+
+  try {
+    return new URL(configuredUrl || requestOrigin).origin;
+  } catch {
+    return new URL(requestOrigin).origin;
+  }
 }
 
 export async function getGalleryViewer(): Promise<GalleryViewer | null> {
