@@ -21,7 +21,7 @@ export default async function ClientLoginPage({ searchParams }: { searchParams: 
         <SectionHeading
           eyebrow="Client access"
           title="Open your private gallery link."
-          description="Your studio will share a private event gallery link. Open it, enter the 4 digit PIN, then browse albums, save favorites, and download when allowed."
+          description="Open the private link shared by the studio, continue with your Google account, then enter the 4 digit event PIN."
         />
         <div className="rounded-lg border border-marigold/30 bg-white p-6 shadow-soft">
           <div className="flex h-12 w-12 items-center justify-center rounded-md bg-rust text-white">
@@ -30,8 +30,9 @@ export default async function ClientLoginPage({ searchParams }: { searchParams: 
           <h2 className="mt-5 text-2xl font-semibold text-ink">Gallery access flow</h2>
           <ol className="mt-4 space-y-3 text-sm leading-6 text-ink/70">
             <li>1. Open the private gallery link shared by the studio.</li>
-            <li>2. Enter the 4 digit event PIN provided by the admin.</li>
-            <li>3. Browse albums, favorite photos, and download files when allowed.</li>
+            <li>2. Continue securely with your own Google account.</li>
+            <li>3. Enter the 4 digit event PIN provided by the studio.</li>
+            <li>4. Browse albums, favorite photos, and download files when allowed.</li>
           </ol>
           <form action={openGalleryAction} className="mt-6 grid gap-3 sm:grid-cols-[1fr_auto]">
             <label className="sr-only" htmlFor="gallery">Gallery code or link</label>
@@ -48,6 +49,7 @@ export default async function ClientLoginPage({ searchParams }: { searchParams: 
           </form>
           {error === "gallery" ? <p className="mt-3 text-sm font-medium text-rust">Enter a valid gallery code or link.</p> : null}
           {error === "credentials" ? <p className="mt-3 text-sm font-medium text-rust">Email or password did not match an active client gallery.</p> : null}
+          {error === "google-required" ? <p className="mt-3 text-sm font-medium text-rust">Gallery viewers must sign in with their own Google account using the shared gallery link.</p> : null}
           <Link
             href={brand.whatsappHref}
             className="mt-6 inline-flex items-center gap-2 rounded-md bg-ink px-5 py-3 text-sm font-semibold text-ivory"

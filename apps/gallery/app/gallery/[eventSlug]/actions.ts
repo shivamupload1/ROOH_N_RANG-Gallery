@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createGallerySession, getGallerySession, verifySecret } from "@/lib/auth";
+import { createGallerySession, galleryVisitorId, getGallerySession, verifySecret } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { selectionSubmissionKey } from "@/lib/selection-submissions";
 import { galleryPinSchema } from "@/lib/validators";
+import { gallerySignInHref, getGalleryViewer } from "@/lib/viewer-auth";
 
 function galleryReturnPath(eventSlug: string, candidate: string) {
   if (candidate.startsWith("/") && !candidate.startsWith("//") && !candidate.includes("?") && !candidate.includes("#")) {
@@ -22,7 +23,16 @@ function galleryReturnUrl(path: string, query: Record<string, string>) {
 
 export async function verifyGalleryPinAction(eventSlug: string, returnPath: string, formData: FormData) {
   const safeReturnPath = galleryReturnPath(eventSlug, returnPath);
-  const parsed = galleryPinSchema.parse(Object.fromEntries(formData));
+  const viewer = await getGalleryViewer();
+  if (!viewer) {
+    redirect(gallerySignInHref(safeReturnPath));
+  }
+
+  const parsedResult = galleryPinSchema.safeParse(Object.fromEntries(formData));
+  if (!parsedResult.success) {
+    redirect(galleryReturnUrl(safeReturnPath, { error: "pin" }));
+  }
+  const parsed = parsedResult.data;
   const event = await prisma.event.findUnique({ where: { id: parsed.eventId } });
 
   if (!event || event.slug !== eventSlug || !event.isPublished) {
@@ -35,33 +45,34 @@ export async function verifyGalleryPinAction(eventSlug: string, returnPath: stri
     redirect(galleryReturnUrl(safeReturnPath, { error: "pin" }));
   }
 
-  await createGallerySession(event.id);
+  await createGallerySession(event.id, viewer, event.pinHash);
   redirect(safeReturnPath);
 }
 
 export async function toggleFavoriteAction(eventSlug: string, returnPath: string, mediaFileId: string) {
   const safeReturnPath = galleryReturnPath(eventSlug, returnPath);
-  const event = await prisma.event.findUnique({ where: { slug: eventSlug }, select: { id: true, accessMode: true } });
+  const viewer = await getGalleryViewer();
+  if (!viewer) {
+    redirect(gallerySignInHref(safeReturnPath));
+  }
+
+  const event = await prisma.event.findUnique({ where: { slug: eventSlug }, select: { id: true, accessMode: true, pinHash: true } });
 
   if (!event) {
     redirect(safeReturnPath);
   }
 
-  let session = await getGallerySession(event.id);
-
-  if (!session && event.accessMode === "PUBLIC") {
-    session = await createGallerySession(event.id);
-  }
-
-  if (!session) {
+  const session = await getGallerySession(event.id, viewer.id, event.pinHash);
+  if (!session && event.accessMode === "PIN") {
     redirect(safeReturnPath);
   }
+  const visitorId = session?.visitorId || galleryVisitorId(viewer.id);
 
   const existing = await prisma.favorite.findFirst({
     where: {
       eventId: event.id,
       mediaFileId,
-      visitorId: session.visitorId
+      visitorId
     },
     select: { id: true }
   });
@@ -73,7 +84,7 @@ export async function toggleFavoriteAction(eventSlug: string, returnPath: string
       data: {
         eventId: event.id,
         mediaFileId,
-        visitorId: session.visitorId
+        visitorId
       }
     });
   }
@@ -94,20 +105,21 @@ export async function submitSelectionAction(eventSlug: string, returnPath: strin
     redirect(safeReturnPath);
   }
 
-  let session = await getGallerySession(event.id);
-
-  if (!session && event.accessMode === "PUBLIC") {
-    session = await createGallerySession(event.id);
+  const viewer = await getGalleryViewer();
+  if (!viewer) {
+    redirect(gallerySignInHref(safeReturnPath));
   }
 
-  if (!session) {
+  const session = await getGallerySession(event.id, viewer.id, event.pinHash);
+  if (!session && event.accessMode === "PIN") {
     redirect(safeReturnPath);
   }
+  const visitorId = session?.visitorId || galleryVisitorId(viewer.id);
 
   const favorites = await prisma.favorite.findMany({
     where: {
       eventId: event.id,
-      visitorId: session.visitorId
+      visitorId
     },
     include: {
       mediaFile: {
@@ -129,7 +141,7 @@ export async function submitSelectionAction(eventSlug: string, returnPath: strin
     eventSlug: event.slug,
     eventName: event.name,
     clientName: event.client.name,
-    visitorId: session.visitorId,
+    visitorId,
     submittedAt: new Date().toISOString(),
     favoriteCount: favorites.length,
     mediaFileIds: favorites.map((favorite) => favorite.mediaFile.id),
@@ -138,13 +150,13 @@ export async function submitSelectionAction(eventSlug: string, returnPath: strin
 
   await prisma.settings.upsert({
     where: {
-      key: selectionSubmissionKey(event.id, session.visitorId)
+      key: selectionSubmissionKey(event.id, visitorId)
     },
     update: {
       value: submissionValue
     },
     create: {
-      key: selectionSubmissionKey(event.id, session.visitorId),
+      key: selectionSubmissionKey(event.id, visitorId),
       value: submissionValue
     }
   });

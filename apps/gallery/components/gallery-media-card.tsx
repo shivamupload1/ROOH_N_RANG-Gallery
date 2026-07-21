@@ -18,7 +18,6 @@ export function GalleryMediaCard({
   eventDownloadsAllowed,
   isFavorite,
   isSelected,
-  isFavoritePending,
   onPreview,
   onToggleFavorite,
   onToggleSelection
@@ -27,7 +26,6 @@ export function GalleryMediaCard({
   eventDownloadsAllowed: boolean;
   isFavorite: boolean;
   isSelected: boolean;
-  isFavoritePending: boolean;
   onPreview: (mediaId: string) => void;
   onToggleFavorite: (mediaId: string) => void;
   onToggleSelection: (mediaId: string) => void;
@@ -72,7 +70,6 @@ export function GalleryMediaCard({
         <button
           type="button"
           onClick={() => onToggleFavorite(media.id)}
-          disabled={isFavoritePending}
           aria-pressed={isFavorite}
           className="grid h-9 w-9 place-items-center text-white drop-shadow-[0_2px_5px_rgba(0,0,0,0.9)] transition hover:scale-110"
           title={isFavorite ? "Remove favorite" : "Save favorite"}

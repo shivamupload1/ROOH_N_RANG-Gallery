@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGallerySession } from "@/lib/auth";
+import { galleryVisitorId, getGallerySession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { fetchDriveFileAsset } from "@/lib/google-drive";
+import { getGalleryViewer } from "@/lib/viewer-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return new NextResponse("Download not allowed", { status: 403 });
   }
 
-  const session = await getGallerySession(media.eventId);
+  const viewer = await getGalleryViewer();
+  if (!viewer) {
+    return new NextResponse("Google sign-in required", { status: 401 });
+  }
+
+  const session = await getGallerySession(media.eventId, viewer.id, media.event.pinHash);
 
   if (!session && media.event.accessMode !== "PUBLIC") {
     return new NextResponse("Gallery PIN required", { status: 401 });
@@ -27,7 +33,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     data: {
       eventId: media.eventId,
       mediaFileId: media.id,
-      visitorId: session?.visitorId || null,
+      visitorId: session?.visitorId || galleryVisitorId(viewer.id),
       ipAddress: request.headers.get("x-forwarded-for")?.split(",")[0] || null,
       userAgent: request.headers.get("user-agent")
     }

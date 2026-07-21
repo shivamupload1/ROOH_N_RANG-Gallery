@@ -3,6 +3,7 @@ import { getGallerySession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { fetchDriveFileAsset } from "@/lib/google-drive";
 import { createSupabaseServiceClient } from "@/lib/supabase-service";
+import { getGalleryViewer } from "@/lib/viewer-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +19,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return new NextResponse("Media not found", { status: 404 });
   }
 
-  const session = await getGallerySession(media.eventId);
+  const viewer = await getGalleryViewer();
+  if (!viewer) {
+    return new NextResponse("Google sign-in required", { status: 401 });
+  }
+
+  const session = await getGallerySession(media.eventId, viewer.id, media.event.pinHash);
 
   if (!session && media.event.accessMode !== "PUBLIC") {
     return new NextResponse("Gallery PIN required", { status: 401 });

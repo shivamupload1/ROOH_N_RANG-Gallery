@@ -11,6 +11,8 @@
   "dependencies": {
     "@rooh/database": "workspace:*",
     "@prisma/client": "6.19.0",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.110.2",
     "bcryptjs": "^3.0.2",
     "lucide-react": "^1.18.0",
     "next": "16.2.9",

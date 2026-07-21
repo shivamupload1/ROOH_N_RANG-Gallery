@@ -2,9 +2,8 @@
 
 import Image from "next/image";
 import { CheckSquare2, ChevronLeft, ChevronRight, Download, Heart, Play, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { toggleFavoriteAction } from "@/app/gallery/[eventSlug]/actions";
 import { GalleryMediaCard, type GalleryMediaItem } from "@/components/gallery-media-card";
 
 function columnsForWidth(width: number) {
@@ -33,10 +32,12 @@ export function GalleryMasonryGrid({
   const gridRef = useRef<HTMLDivElement>(null);
   const [columnCount, setColumnCount] = useState(2);
   const [favoriteMediaIds, setFavoriteMediaIds] = useState(() => new Set(favoriteIds));
+  const favoriteMediaIdsRef = useRef(new Set(favoriteIds));
+  const favoriteQueuesRef = useRef(new Map<string, Promise<void>>());
   const [selectedMediaIds, setSelectedMediaIds] = useState(() => new Set<string>());
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [slideDirection, setSlideDirection] = useState<"left" | "right">("right");
-  const [isFavoritePending, startFavoriteTransition] = useTransition();
+  const [isBulkFavoritePending, setIsBulkFavoritePending] = useState(false);
   const activeMedia = activeIndex == null ? null : navigationMedia[activeIndex] || null;
   const activeImageSrc = activeMedia && (activeMedia.mediaType === "PHOTO" || activeMedia.thumbnailUrl)
     ? `/api/media/${activeMedia.id}`
@@ -87,27 +88,52 @@ export function GalleryMasonryGrid({
     setActiveIndex(nextIndex);
   }
 
-  function toggleFavorite(mediaId: string) {
-    const wasFavorite = favoriteMediaIds.has(mediaId);
-    setFavoriteMediaIds((current) => {
-      const next = new Set(current);
-      if (wasFavorite) next.delete(mediaId);
-      else next.add(mediaId);
-      return next;
+  function applyFavoriteState(mediaIds: string[], favorite: boolean) {
+    const next = new Set(favoriteMediaIdsRef.current);
+    mediaIds.forEach((mediaId) => favorite ? next.add(mediaId) : next.delete(mediaId));
+    favoriteMediaIdsRef.current = next;
+    setFavoriteMediaIds(next);
+  }
+
+  async function saveFavoriteState(mediaIds: string[], favorite: boolean) {
+    const response = await fetch(`/api/gallery/${encodeURIComponent(eventSlug)}/favorites`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mediaIds, favorite })
     });
 
-    startFavoriteTransition(async () => {
-      try {
-        await toggleFavoriteAction(eventSlug, basePath, mediaId);
-      } catch {
-        setFavoriteMediaIds((current) => {
-          const next = new Set(current);
-          if (wasFavorite) next.add(mediaId);
-          else next.delete(mediaId);
-          return next;
-        });
-      }
-    });
+    if (response.status === 401) {
+      window.location.assign(`/auth/sign-in?next=${encodeURIComponent(basePath)}`);
+    } else if (response.status === 403) {
+      window.location.assign(basePath);
+    }
+
+    if (!response.ok) {
+      throw new Error("Favorite update failed.");
+    }
+  }
+
+  function toggleFavorite(mediaId: string) {
+    const nextFavorite = !favoriteMediaIdsRef.current.has(mediaId);
+    applyFavoriteState([mediaId], nextFavorite);
+
+    const previousRequest = favoriteQueuesRef.current.get(mediaId) || Promise.resolve();
+    const request = previousRequest
+      .catch(() => undefined)
+      .then(() => saveFavoriteState([mediaId], nextFavorite));
+
+    favoriteQueuesRef.current.set(mediaId, request);
+    void request
+      .catch(() => {
+        if (favoriteMediaIdsRef.current.has(mediaId) === nextFavorite) {
+          applyFavoriteState([mediaId], !nextFavorite);
+        }
+      })
+      .finally(() => {
+        if (favoriteQueuesRef.current.get(mediaId) === request) {
+          favoriteQueuesRef.current.delete(mediaId);
+        }
+      });
   }
 
   function toggleSelection(mediaId: string) {
@@ -119,27 +145,24 @@ export function GalleryMasonryGrid({
     });
   }
 
-  function favoriteSelected() {
-    const mediaIds = [...selectedMediaIds].filter((mediaId) => !favoriteMediaIds.has(mediaId));
+  async function setSelectedFavoriteState(favorite: boolean) {
+    const mediaIds = [...selectedMediaIds].filter((mediaId) => favoriteMediaIdsRef.current.has(mediaId) !== favorite);
     if (mediaIds.length === 0) return;
 
-    setFavoriteMediaIds((current) => new Set([...current, ...mediaIds]));
-    startFavoriteTransition(async () => {
-      const results = await Promise.allSettled(
-        mediaIds.map((mediaId) => toggleFavoriteAction(eventSlug, basePath, mediaId))
-      );
-      const failedMediaIds = new Set(
-        results.flatMap((result, index) => result.status === "rejected" ? [mediaIds[index]] : [])
-      );
+    const previousStates = new Map(mediaIds.map((mediaId) => [mediaId, favoriteMediaIdsRef.current.has(mediaId)]));
+    applyFavoriteState(mediaIds, favorite);
+    setIsBulkFavoritePending(true);
 
-      if (failedMediaIds.size > 0) {
-        setFavoriteMediaIds((current) => {
-          const next = new Set(current);
-          failedMediaIds.forEach((mediaId) => next.delete(mediaId));
-          return next;
-        });
-      }
-    });
+    try {
+      await saveFavoriteState(mediaIds, favorite);
+    } catch {
+      const restoreFavorite = mediaIds.filter((mediaId) => previousStates.get(mediaId));
+      const restoreNotFavorite = mediaIds.filter((mediaId) => !previousStates.get(mediaId));
+      if (restoreFavorite.length > 0) applyFavoriteState(restoreFavorite, true);
+      if (restoreNotFavorite.length > 0) applyFavoriteState(restoreNotFavorite, false);
+    } finally {
+      setIsBulkFavoritePending(false);
+    }
   }
 
   function toggleCurrentPageSelection() {
@@ -213,7 +236,6 @@ export function GalleryMasonryGrid({
             <button
               type="button"
               onClick={() => toggleFavorite(activeMedia.id)}
-              disabled={isFavoritePending}
               aria-pressed={favoriteMediaIds.has(activeMedia.id)}
               className="grid h-11 w-11 place-items-center rounded-full border border-white/30 bg-black/[0.28] text-white backdrop-blur-md transition hover:bg-black/45"
               title={favoriteMediaIds.has(activeMedia.id) ? "Remove favorite" : "Save favorite"}
@@ -299,7 +321,6 @@ export function GalleryMasonryGrid({
                 eventDownloadsAllowed={eventDownloadsAllowed}
                 isFavorite={favoriteMediaIds.has(mediaFile.id)}
                 isSelected={selectedMediaIds.has(mediaFile.id)}
-                isFavoritePending={isFavoritePending}
                 onPreview={openPreview}
                 onToggleFavorite={toggleFavorite}
                 onToggleSelection={toggleSelection}
@@ -339,12 +360,22 @@ export function GalleryMasonryGrid({
           </button>
           <button
             type="button"
-            onClick={favoriteSelected}
-            disabled={isFavoritePending || [...selectedMediaIds].every((mediaId) => favoriteMediaIds.has(mediaId))}
+            onClick={() => void setSelectedFavoriteState(true)}
+            disabled={isBulkFavoritePending || [...selectedMediaIds].every((mediaId) => favoriteMediaIds.has(mediaId))}
             className="inline-flex h-8 shrink-0 items-center gap-1.5 px-1.5 text-xs text-white/85 transition hover:text-[#e0444f] disabled:opacity-35"
             title="Add selected photos to favorites"
           >
             Favorite
+            <Heart size={15} />
+          </button>
+          <button
+            type="button"
+            onClick={() => void setSelectedFavoriteState(false)}
+            disabled={isBulkFavoritePending || [...selectedMediaIds].every((mediaId) => !favoriteMediaIds.has(mediaId))}
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 px-1.5 text-xs text-white/85 transition hover:text-white disabled:opacity-35"
+            title="Remove selected photos from favorites"
+          >
+            Unfavorite
             <Heart size={15} />
           </button>
         </div>

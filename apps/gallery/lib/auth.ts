@@ -1,6 +1,7 @@
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
+import type { GalleryViewer } from "@/lib/viewer-auth";
 
 const GALLERY_SESSION_COOKIE = "rr_gallery_session";
 const GALLERY_SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
@@ -8,6 +9,8 @@ const GALLERY_SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 export type GallerySession = {
   eventId: string;
   visitorId: string;
+  authUserId: string;
+  accessKey: string;
   exp: number;
 };
 
@@ -38,8 +41,16 @@ function readToken(token: string): GallerySession | null {
   if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return null;
 
   const session = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as GallerySession;
-  if (!session.eventId || !session.visitorId || session.exp < Math.floor(Date.now() / 1000)) return null;
+  if (!session.eventId || !session.visitorId || !session.authUserId || !session.accessKey || session.exp < Math.floor(Date.now() / 1000)) return null;
   return session;
+}
+
+function galleryAccessKey(pinHash: string) {
+  return createHmac("sha256", sessionSecret()).update(`gallery-access:${pinHash}`).digest("base64url").slice(0, 32);
+}
+
+export function galleryVisitorId(authUserId: string) {
+  return `google:${authUserId}`;
 }
 
 export async function hashSecret(value: string) {
@@ -50,10 +61,12 @@ export async function verifySecret(value: string, hash: string) {
   return bcrypt.compare(value, hash);
 }
 
-export async function createGallerySession(eventId: string) {
+export async function createGallerySession(eventId: string, viewer: GalleryViewer, pinHash: string) {
   const session: GallerySession = {
     eventId,
-    visitorId: randomUUID(),
+    visitorId: galleryVisitorId(viewer.id),
+    authUserId: viewer.id,
+    accessKey: galleryAccessKey(pinHash),
     exp: Math.floor(Date.now() / 1000) + GALLERY_SESSION_TTL_SECONDS
   };
   const cookieStore = await cookies();
@@ -67,13 +80,21 @@ export async function createGallerySession(eventId: string) {
   return session;
 }
 
-export async function getGallerySession(eventId: string) {
+export async function getGallerySession(eventId: string, authUserId: string, pinHash: string) {
   const token = (await cookies()).get(GALLERY_SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
     const session = readToken(token);
-    return session?.eventId === eventId ? session : null;
+    return session?.eventId === eventId &&
+      session.authUserId === authUserId &&
+      session.accessKey === galleryAccessKey(pinHash)
+      ? session
+      : null;
   } catch {
     return null;
   }
+}
+
+export async function clearGallerySession() {
+  (await cookies()).delete(GALLERY_SESSION_COOKIE);
 }

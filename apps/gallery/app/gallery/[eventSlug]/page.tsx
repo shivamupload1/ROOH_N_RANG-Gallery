@@ -1,16 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowDown, ChevronLeft, ChevronRight, Download, Heart, LockKeyhole, Play, Send, X } from "lucide-react";
 import type { CSSProperties } from "react";
 import { submitSelectionAction, toggleFavoriteAction, verifyGalleryPinAction } from "@/app/gallery/[eventSlug]/actions";
 import { FormField } from "@/components/admin/form-field";
 import { GalleryMasonryGrid } from "@/components/gallery-masonry-grid";
 import { GalleryShareButton } from "@/components/gallery-share-button";
-import { getGallerySession } from "@/lib/auth";
+import { galleryVisitorId, getGallerySession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { eventCoverKey, parseEventCover } from "@/lib/event-cover";
 import { parseSelectionSubmission, selectionSubmissionKey } from "@/lib/selection-submissions";
 import { getSiteBrand } from "@/lib/site-content";
+import { gallerySignInHref, getGalleryViewer } from "@/lib/viewer-auth";
 
 export const dynamic = "force-dynamic";
 const GALLERY_PAGE_SIZE = 150;
@@ -116,7 +118,12 @@ export default async function GalleryPage({
     );
   }
 
-  const session = await getGallerySession(event.id);
+  const viewer = await getGalleryViewer();
+  if (!viewer) {
+    redirect(gallerySignInHref(basePath));
+  }
+
+  const session = await getGallerySession(event.id, viewer.id, event.pinHash);
 
   if (!session && event.accessMode === "PIN") {
     return (
@@ -125,6 +132,10 @@ export default async function GalleryPage({
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-rust">{brand.name}</p>
           <h1 className="mt-3 text-3xl font-semibold">{event.name}</h1>
           <p className="mt-2 text-sm text-ink/60">{event.client.name} private gallery</p>
+          <div className="mt-5 flex items-center justify-between gap-3 border-y border-ink/10 py-3 text-xs text-ink/55">
+            <span className="truncate">Signed in as {viewer.email}</span>
+            <Link href={`/auth/sign-out?next=${encodeURIComponent(basePath)}`} className="shrink-0 font-semibold text-rust transition hover:text-ink">Use another account</Link>
+          </div>
           <form action={verifyGalleryPinAction.bind(null, event.slug, basePath)} className="mt-7 grid gap-4">
             <input type="hidden" name="eventId" value={event.id} />
             <FormField label="4 digit gallery PIN" name="pin" type="password" inputMode="numeric" minLength={4} maxLength={4} required />
@@ -139,15 +150,16 @@ export default async function GalleryPage({
     );
   }
 
+  const visitorId = session?.visitorId || galleryVisitorId(viewer.id);
   const [favorites, selectionRecord, coverRecord] = await Promise.all([
-    session ? prisma.favorite.findMany({
-      where: { eventId: event.id, visitorId: session.visitorId },
+    prisma.favorite.findMany({
+      where: { eventId: event.id, visitorId },
       select: { mediaFileId: true }
-    }) : Promise.resolve([]),
-    session ? prisma.settings.findUnique({
-      where: { key: selectionSubmissionKey(event.id, session.visitorId) },
+    }),
+    prisma.settings.findUnique({
+      where: { key: selectionSubmissionKey(event.id, visitorId) },
       select: { value: true }
-    }) : Promise.resolve(null),
+    }),
     prisma.settings.findUnique({
       where: { key: eventCoverKey(event.id) },
       select: { value: true }
