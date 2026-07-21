@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseRouteClient } from "@/lib/supabase/route";
 import { GALLERY_AUTH_NEXT_COOKIE, galleryPublicOrigin, safeInternalPath } from "@/lib/viewer-auth";
 
 export async function GET(request: NextRequest) {
@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   const publicOrigin = galleryPublicOrigin(request.nextUrl.origin);
   const callbackUrl = new URL("/auth/callback", publicOrigin);
 
-  const supabase = await createSupabaseServerClient();
+  const { supabase, applyAuthCookies } = createSupabaseRouteClient(request);
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const signInUrl = new URL("/auth/sign-in", publicOrigin);
     signInUrl.searchParams.set("next", nextPath);
     signInUrl.searchParams.set("error", "google");
-    return NextResponse.redirect(signInUrl);
+    return applyAuthCookies(NextResponse.redirect(signInUrl));
   }
 
   const response = NextResponse.redirect(data.url);
@@ -33,5 +33,5 @@ export async function GET(request: NextRequest) {
     maxAge: 60 * 10,
     path: "/"
   });
-  return response;
+  return applyAuthCookies(response);
 }

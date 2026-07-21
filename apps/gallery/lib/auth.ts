@@ -61,7 +61,7 @@ export async function verifySecret(value: string, hash: string) {
   return bcrypt.compare(value, hash);
 }
 
-export async function createGallerySession(eventId: string, viewer: GalleryViewer, pinHash: string) {
+export function createGallerySessionCookie(eventId: string, viewer: GalleryViewer, pinHash: string) {
   const session: GallerySession = {
     eventId,
     visitorId: galleryVisitorId(viewer.id),
@@ -69,15 +69,21 @@ export async function createGallerySession(eventId: string, viewer: GalleryViewe
     accessKey: galleryAccessKey(pinHash),
     exp: Math.floor(Date.now() / 1000) + GALLERY_SESSION_TTL_SECONDS
   };
-  const cookieStore = await cookies();
-  cookieStore.set(GALLERY_SESSION_COOKIE, createToken(session), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: GALLERY_SESSION_TTL_SECONDS,
-    path: "/"
-  });
-  return session;
+
+  return {
+    session,
+    cookie: {
+      name: GALLERY_SESSION_COOKIE,
+      value: createToken(session),
+      options: {
+        httpOnly: true,
+        sameSite: "lax" as const,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: GALLERY_SESSION_TTL_SECONDS,
+        path: "/"
+      }
+    }
+  };
 }
 
 export async function getGallerySession(eventId: string, authUserId: string, pinHash: string) {

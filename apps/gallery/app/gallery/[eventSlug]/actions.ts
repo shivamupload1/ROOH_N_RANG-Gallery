@@ -2,10 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createGallerySession, galleryVisitorId, getGallerySession, verifySecret } from "@/lib/auth";
+import { galleryVisitorId, getGallerySession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { selectionSubmissionKey } from "@/lib/selection-submissions";
-import { galleryPinSchema } from "@/lib/validators";
 import { gallerySignInHref, getGalleryViewer } from "@/lib/viewer-auth";
 
 function galleryReturnPath(eventSlug: string, candidate: string) {
@@ -19,34 +18,6 @@ function galleryReturnPath(eventSlug: string, candidate: string) {
 function galleryReturnUrl(path: string, query: Record<string, string>) {
   const params = new URLSearchParams(query);
   return params.size > 0 ? `${path}?${params.toString()}` : path;
-}
-
-export async function verifyGalleryPinAction(eventSlug: string, returnPath: string, formData: FormData) {
-  const safeReturnPath = galleryReturnPath(eventSlug, returnPath);
-  const viewer = await getGalleryViewer();
-  if (!viewer) {
-    redirect(gallerySignInHref(safeReturnPath));
-  }
-
-  const parsedResult = galleryPinSchema.safeParse(Object.fromEntries(formData));
-  if (!parsedResult.success) {
-    redirect(galleryReturnUrl(safeReturnPath, { error: "pin" }));
-  }
-  const parsed = parsedResult.data;
-  const event = await prisma.event.findUnique({ where: { id: parsed.eventId } });
-
-  if (!event || event.slug !== eventSlug || !event.isPublished) {
-    redirect(galleryReturnUrl(safeReturnPath, { error: "unavailable" }));
-  }
-
-  const matches = await verifySecret(parsed.pin, event.pinHash);
-
-  if (!matches) {
-    redirect(galleryReturnUrl(safeReturnPath, { error: "pin" }));
-  }
-
-  await createGallerySession(event.id, viewer, event.pinHash);
-  redirect(safeReturnPath);
 }
 
 export async function toggleFavoriteAction(eventSlug: string, returnPath: string, mediaFileId: string) {

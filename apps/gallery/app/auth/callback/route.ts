@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseRouteClient } from "@/lib/supabase/route";
 import { GALLERY_AUTH_NEXT_COOKIE, galleryPublicOrigin, safeInternalPath } from "@/lib/viewer-auth";
 
 export async function GET(request: NextRequest) {
@@ -8,14 +8,14 @@ export async function GET(request: NextRequest) {
     request.cookies.get(GALLERY_AUTH_NEXT_COOKIE)?.value || request.nextUrl.searchParams.get("next")
   );
   const publicOrigin = galleryPublicOrigin(request.nextUrl.origin);
+  const { supabase, applyAuthCookies } = createSupabaseRouteClient(request);
 
   if (code) {
-    const supabase = await createSupabaseServerClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
       const response = NextResponse.redirect(new URL(nextPath, publicOrigin));
       response.cookies.delete(GALLERY_AUTH_NEXT_COOKIE);
-      return response;
+      return applyAuthCookies(response);
     }
   }
 
@@ -24,5 +24,5 @@ export async function GET(request: NextRequest) {
   signInUrl.searchParams.set("error", "callback");
   const response = NextResponse.redirect(signInUrl);
   response.cookies.delete(GALLERY_AUTH_NEXT_COOKIE);
-  return response;
+  return applyAuthCookies(response);
 }

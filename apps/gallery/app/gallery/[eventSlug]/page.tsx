@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowDown, ChevronLeft, ChevronRight, Download, Heart, LockKeyhole, Play, Send, X } from "lucide-react";
 import type { CSSProperties } from "react";
-import { submitSelectionAction, toggleFavoriteAction, verifyGalleryPinAction } from "@/app/gallery/[eventSlug]/actions";
+import { submitSelectionAction, toggleFavoriteAction } from "@/app/gallery/[eventSlug]/actions";
 import { FormField } from "@/components/admin/form-field";
 import { GalleryMasonryGrid } from "@/components/gallery-masonry-grid";
 import { GalleryShareButton } from "@/components/gallery-share-button";
@@ -136,8 +136,9 @@ export default async function GalleryPage({
             <span className="truncate">Signed in as {viewer.email}</span>
             <Link href={`/auth/sign-out?next=${encodeURIComponent(basePath)}`} className="shrink-0 font-semibold text-rust transition hover:text-ink">Use another account</Link>
           </div>
-          <form action={verifyGalleryPinAction.bind(null, event.slug, basePath)} className="mt-7 grid gap-4">
+          <form action={`/gallery/${event.slug}/unlock`} method="post" className="mt-7 grid gap-4">
             <input type="hidden" name="eventId" value={event.id} />
+            <input type="hidden" name="returnPath" value={basePath} />
             <FormField label="4 digit gallery PIN" name="pin" type="password" inputMode="numeric" minLength={4} maxLength={4} required />
             {error === "pin" ? <p className="rounded-md bg-rust/10 px-3 py-2 text-sm font-semibold text-rust">Wrong PIN. Please try again.</p> : null}
             <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-md bg-ink px-5 py-3 text-sm font-semibold text-ivory transition hover:bg-rust">
