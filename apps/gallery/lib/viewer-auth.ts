@@ -33,5 +33,13 @@ export async function getGalleryViewer(): Promise<GalleryViewer | null> {
   const id = typeof claims?.sub === "string" ? claims.sub : "";
   const email = typeof claims?.email === "string" ? claims.email.toLowerCase() : "";
 
-  return error || !id || !email ? null : { id, email };
+  if (!error && id && email) {
+    return { id, email };
+  }
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  const userId = userData.user?.id || "";
+  const userEmail = userData.user?.email?.toLowerCase() || "";
+
+  return userError || !userId || !userEmail ? null : { id: userId, email: userEmail };
 }
