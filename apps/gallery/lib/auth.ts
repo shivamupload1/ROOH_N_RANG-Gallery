@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import type { GalleryViewer } from "@/lib/viewer-auth";
 
 const GALLERY_SESSION_COOKIE = "rr_gallery_session";
-const GALLERY_SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+const GALLERY_SESSION_TTL_SECONDS = 60 * 60 * 8;
 
 export type GallerySession = {
   eventId: string;
@@ -79,7 +79,6 @@ export function createGallerySessionCookie(eventId: string, viewer: GalleryViewe
         httpOnly: true,
         sameSite: "lax" as const,
         secure: process.env.NODE_ENV === "production",
-        maxAge: GALLERY_SESSION_TTL_SECONDS,
         path: "/"
       }
     }

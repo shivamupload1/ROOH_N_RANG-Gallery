@@ -57,12 +57,29 @@ model User {
   email        String     @unique
   phone        String?
   passwordHash String?
-  role         UserRole   @default(CLIENT)
+  role         UserRole   @default(GUEST)
   clients      Client[]
+  authHandoffs AuthHandoff[]
+  galleryAccesses UserGalleryAccess[]
   favorites    Favorite[]
   downloads    Download[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
+}
+
+model AuthHandoff {
+  id          String    @id @default(cuid())
+  tokenHash   String    @unique
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  destination String
+  returnPath  String
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
 }
 
 model Client {
@@ -124,6 +141,7 @@ model Event {
   isPublished     Boolean      @default(false)
   albums          Album[]
   mediaFiles      MediaFile[]
+  viewerAccesses  UserGalleryAccess[]
   favorites       Favorite[]
   downloads       Download[]
   createdAt       DateTime     @default(now())
@@ -133,6 +151,23 @@ model Event {
   @@index([driveAccountId])
   @@index([isPublished])
   @@index([expiryDate])
+}
+
+model UserGalleryAccess {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventId        String
+  event          Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  firstAccessedAt DateTime @default(now())
+  lastAccessedAt DateTime @default(now())
+  accessCount    Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, eventId])
+  @@index([eventId, lastAccessedAt])
+  @@index([userId, lastAccessedAt])
 }
 
 model Album {

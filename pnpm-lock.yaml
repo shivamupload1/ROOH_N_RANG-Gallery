@@ -79,42 +79,6 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  apps/admin:
-    dependencies:
-      '@prisma/client':
-        specifier: 6.19.0
-        version: 6.19.0(prisma@6.19.0(typescript@5.9.3))(typescript@5.9.3)
-      '@rooh/database':
-        specifier: workspace:*
-        version: link:../../packages/database
-      '@supabase/ssr':
-        specifier: ^0.12.0
-        version: 0.12.0(@supabase/supabase-js@2.110.2)
-      '@supabase/supabase-js':
-        specifier: ^2.110.2
-        version: 2.110.2
-      bcryptjs:
-        specifier: ^3.0.2
-        version: 3.0.3
-      googleapis:
-        specifier: ^173.0.0
-        version: 173.0.0
-      lucide-react:
-        specifier: ^1.18.0
-        version: 1.18.0(react@19.2.7)
-      next:
-        specifier: 16.2.9
-        version: 16.2.9(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      react:
-        specifier: 19.2.7
-        version: 19.2.7
-      react-dom:
-        specifier: 19.2.7
-        version: 19.2.7(react@19.2.7)
-      zod:
-        specifier: ^4.1.12
-        version: 4.4.3
-
   apps/gallery:
     dependencies:
       '@prisma/client':
@@ -132,30 +96,6 @@ importers:
       bcryptjs:
         specifier: ^3.0.2
         version: 3.0.3
-      lucide-react:
-        specifier: ^1.18.0
-        version: 1.18.0(react@19.2.7)
-      next:
-        specifier: 16.2.9
-        version: 16.2.9(@babel/core@7.29.7)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      react:
-        specifier: 19.2.7
-        version: 19.2.7
-      react-dom:
-        specifier: 19.2.7
-        version: 19.2.7(react@19.2.7)
-      zod:
-        specifier: ^4.1.12
-        version: 4.4.3
-
-  apps/website:
-    dependencies:
-      '@prisma/client':
-        specifier: 6.19.0
-        version: 6.19.0(prisma@6.19.0(typescript@5.9.3))(typescript@5.9.3)
-      '@rooh/database':
-        specifier: workspace:*
-        version: link:../../packages/database
       lucide-react:
         specifier: ^1.18.0
         version: 1.18.0(react@19.2.7)

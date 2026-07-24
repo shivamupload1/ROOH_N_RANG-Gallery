@@ -4,9 +4,9 @@ import { redirect } from "next/navigation";
 import { ArrowDown, ChevronLeft, ChevronRight, Download, Heart, LockKeyhole, Play, Send, X } from "lucide-react";
 import type { CSSProperties } from "react";
 import { submitSelectionAction, toggleFavoriteAction } from "@/app/gallery/[eventSlug]/actions";
-import { FormField } from "@/components/admin/form-field";
 import { GalleryMasonryGrid } from "@/components/gallery-masonry-grid";
 import { GalleryShareButton } from "@/components/gallery-share-button";
+import { GalleryPinOverlay } from "@/components/gallery-pin-overlay";
 import { galleryVisitorId, getGallerySession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { eventCoverKey, parseEventCover } from "@/lib/event-cover";
@@ -123,36 +123,41 @@ export default async function GalleryPage({
     redirect(gallerySignInHref(basePath));
   }
 
+  const coverRecord = await prisma.settings.findUnique({
+    where: { key: eventCoverKey(event.id) },
+    select: { value: true }
+  });
+  const cover = parseEventCover(coverRecord?.value);
   const session = await getGallerySession(event.id, viewer.id, event.pinHash);
 
   if (!session && event.accessMode === "PIN") {
+    const pinMedia = [...event.mediaFiles, ...event.albums.flatMap((album) => album.mediaFiles)];
+    const coverMedia =
+      pinMedia.find((mediaFile) => mediaFile.id === cover.mediaFileId) ||
+      pinMedia.find((mediaFile) => mediaFile.isFeatured && mediaFile.mediaType === "PHOTO") ||
+      pinMedia.find((mediaFile) => mediaFile.mediaType === "PHOTO");
+    const meta = [event.city, formatEventDate(event.eventDate)].filter(Boolean).join(" / ");
+
     return (
-      <main className="min-h-screen bg-ivory px-4 py-16 text-ink">
-        <div className="mx-auto max-w-md rounded-lg border border-marigold/30 bg-white p-8 shadow-soft">
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-rust">{brand.name}</p>
-          <h1 className="mt-3 text-3xl font-semibold">{event.name}</h1>
-          <p className="mt-2 text-sm text-ink/60">{event.client.name} private gallery</p>
-          <div className="mt-5 flex items-center justify-between gap-3 border-y border-ink/10 py-3 text-xs text-ink/55">
-            <span className="truncate">Signed in as {viewer.email}</span>
-            <Link href={`/auth/sign-out?next=${encodeURIComponent(basePath)}`} className="shrink-0 font-semibold text-rust transition hover:text-ink">Use another account</Link>
-          </div>
-          <form action={`/gallery/${event.slug}/unlock`} method="post" className="mt-7 grid gap-4">
-            <input type="hidden" name="eventId" value={event.id} />
-            <input type="hidden" name="returnPath" value={basePath} />
-            <FormField label="4 digit gallery PIN" name="pin" type="password" inputMode="numeric" minLength={4} maxLength={4} required />
-            {error === "pin" ? <p className="rounded-md bg-rust/10 px-3 py-2 text-sm font-semibold text-rust">Wrong PIN. Please try again.</p> : null}
-            <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-md bg-ink px-5 py-3 text-sm font-semibold text-ivory transition hover:bg-rust">
-              <LockKeyhole size={17} />
-              Open Gallery
-            </button>
-          </form>
-        </div>
-      </main>
+      <GalleryPinOverlay
+        action={`/gallery/${event.slug}/unlock`}
+        eventId={event.id}
+        returnPath={basePath}
+        galleryName={event.name}
+        clientName={event.client.name}
+        meta={meta}
+        viewerEmail={viewer.email}
+        signOutHref={`/auth/sign-out?next=${encodeURIComponent(basePath)}`}
+        backgroundSrc={coverMedia ? `/api/media/${coverMedia.id}` : null}
+        desktopPosition={`${cover.desktopPositionX}% ${cover.desktopPositionY}%`}
+        mobilePosition={`${cover.mobilePositionX}% ${cover.mobilePositionY}%`}
+        hasError={error === "pin"}
+      />
     );
   }
 
   const visitorId = session?.visitorId || galleryVisitorId(viewer.id);
-  const [favorites, selectionRecord, coverRecord] = await Promise.all([
+  const [favorites, selectionRecord] = await Promise.all([
     prisma.favorite.findMany({
       where: { eventId: event.id, visitorId },
       select: { mediaFileId: true }
@@ -160,15 +165,10 @@ export default async function GalleryPage({
     prisma.settings.findUnique({
       where: { key: selectionSubmissionKey(event.id, visitorId) },
       select: { value: true }
-    }),
-    prisma.settings.findUnique({
-      where: { key: eventCoverKey(event.id) },
-      select: { value: true }
     })
   ]);
   const favoriteIds = new Set(favorites.map((favorite) => favorite.mediaFileId));
   const savedSelection = parseSelectionSubmission(selectionRecord?.value);
-  const cover = parseEventCover(coverRecord?.value);
   const coverMediaId = cover.mediaFileId;
 
   const rootMedia = [...event.mediaFiles].sort(compareMediaByFileName);

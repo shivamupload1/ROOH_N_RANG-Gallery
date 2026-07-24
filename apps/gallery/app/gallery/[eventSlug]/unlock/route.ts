@@ -40,6 +40,50 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return redirectWithError(publicOrigin, returnPath, "pin");
   }
 
+  let appUser = viewer.userId
+    ? await prisma.user.findUnique({ where: { id: viewer.userId } })
+    : await prisma.user.findFirst({
+        where: {
+          OR: [
+            { authUserId: viewer.id },
+            { email: { equals: viewer.email, mode: "insensitive" } }
+          ]
+        }
+      });
+
+  if (!appUser) {
+    appUser = await prisma.user.create({
+      data: {
+        authUserId: viewer.id,
+        email: viewer.email,
+        name: viewer.name || null,
+        role: "GUEST"
+      }
+    });
+  } else if (!appUser.authUserId) {
+    appUser = await prisma.user.update({
+      where: { id: appUser.id },
+      data: { authUserId: viewer.id }
+    });
+  }
+
+  await prisma.userGalleryAccess.upsert({
+    where: {
+      userId_eventId: {
+        userId: appUser.id,
+        eventId: event.id
+      }
+    },
+    update: {
+      lastAccessedAt: new Date(),
+      accessCount: { increment: 1 }
+    },
+    create: {
+      userId: appUser.id,
+      eventId: event.id
+    }
+  });
+
   const { cookie } = createGallerySessionCookie(event.id, viewer, event.pinHash);
   const response = NextResponse.redirect(new URL(returnPath, publicOrigin), 303);
   response.cookies.set(cookie.name, cookie.value, cookie.options);
