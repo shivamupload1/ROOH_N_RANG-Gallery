@@ -11,7 +11,7 @@ export type GalleryViewer = {
   role?: "ADMIN" | "CLIENT" | "GUEST";
 };
 
-export function safeInternalPath(candidate: string | null | undefined, fallback = "/client-login") {
+export function safeInternalPath(candidate: string | null | undefined, fallback = "/") {
   const value = String(candidate || "").trim();
   return value.startsWith("/") && !value.startsWith("//") && !value.includes("\\") ? value : fallback;
 }
